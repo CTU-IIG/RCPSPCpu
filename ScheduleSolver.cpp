@@ -235,14 +235,37 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 	srand(time(NULL));
 	uint32_t numberOfIterSinceBest = 0;
 
+	// Prepare matrix of successors (~1) / predecessors (~-1).
+	int8_t ** relationMatrix = new int8_t*[numberOfActivities];
+	for (int8_t** ptr = relationMatrix; ptr < relationMatrix+numberOfActivities; ++ptr)	{
+		*ptr = new int8_t[numberOfActivities];
+		memset(*ptr, 0, sizeof(int8_t)*numberOfActivities);
+	}
+
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
+		for (uint32_t j = 0; j < numberOfSuccessors[activityId]; ++j)	{
+			relationMatrix[activityId][activitiesSuccessors[activityId][j]] = 1;
+		}
+	}
+
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
+		for (uint32_t j = 0; j < numberOfPredecessors[activityId]; ++j)	{
+			relationMatrix[activityId][activitiesPredecessors[activityId][j]] = -1;
+		}
+	}
+
 	for (uint32_t iter = 0; iter < maxIter; ++iter)	{
 		size_t neighborhoodSize = 0;
 		MoveType iterBestMove = NONE;
 		uint32_t iterBestI = 0, iterBestJ = 0, iterShiftDiff = 0;
 		size_t iterBestEval = UINT32_MAX;
-		size_t totalSwaps = 0, swapsWithoutPenalty = 0;
 
-		#pragma omp parallel reduction(+:neighborhoodSize, totalSwaps, swapsWithoutPenalty)
+		uint32_t *currentScheduleStartTimes = new uint32_t[numberOfActivities];
+		uint32_t *currentScheduleStartTimesById = new uint32_t[numberOfActivities];
+		evaluateOrder(activitiesOrder, currentScheduleStartTimes, currentScheduleStartTimesById);
+		delete[] currentScheduleStartTimesById;
+
+		#pragma omp parallel reduction(+:neighborhoodSize)
 		{
 			/* PRIVATE DATA FOR EVERY THREAD */
 			MoveType threadBestMove = NONE;
@@ -256,31 +279,40 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 			uint32_t *threadStartTimesById = new uint32_t[numberOfActivities];
 
 			/* HUGE COMPUTING... */
-			#pragma omp for
+			#pragma omp for schedule(dynamic)
 			for (uint32_t i = 1; i < numberOfActivities-1; ++i)	{
 
 				/* SWAP MOVES */
 				uint32_t u = min(i+1+SWAP_RANGE, numberOfActivities-1);
 				for (uint32_t j = i+1; j < u; ++j)	{
-					swap(threadOrder[i], threadOrder[j]);
-					#ifdef SIMPLE_TABU
-					bool isPossibleMove = tabu.isPossibleMove(i, j);
-					#endif
-					#ifdef ADVANCE_TABU
-					bool isPossibleMove = tabu.isPossibleMove(i, j, SWAP);
-					#endif
-					++totalSwaps;
-					uint32_t scheduleLength = evaluateOrder(threadOrder, NULL, threadStartTimesById);
-					uint32_t precedencePenalty = computePrecedencePenalty(threadStartTimesById);
-					if (precedencePenalty == 0)
-						++swapsWithoutPenalty;
-					uint32_t totalMoveCost = scheduleLength+precedencePenalty;
-					if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
-						threadBestI = i; threadBestJ = j; threadBestMove = SWAP;
-						threadBestEval = totalMoveCost;
-						++threadNeighborhoodCounter;
+
+					// Check if current selected swap is precedence penalty free.
+					bool precedenceFree = true;
+					for (uint32_t k = i; k < j; ++k)	{
+						if (relationMatrix[activitiesOrder[k]][activitiesOrder[j]] == 1)	{
+							precedenceFree = false;
+							break;
+						}
 					}
-					swap(threadOrder[i], threadOrder[j]);
+
+					if ((currentScheduleStartTimes[i] != currentScheduleStartTimes[j]) && (precedenceFree == true))	{
+						swap(threadOrder[i], threadOrder[j]);
+						#ifdef SIMPLE_TABU
+						bool isPossibleMove = tabu.isPossibleMove(i, j);
+						#endif
+						#ifdef ADVANCE_TABU
+						bool isPossibleMove = tabu.isPossibleMove(i, j, SWAP);
+						#endif
+						uint32_t totalMoveCost = evaluateOrder(threadOrder, NULL, threadStartTimesById);
+						if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
+							threadBestI = i; threadBestJ = j; threadBestMove = SWAP;
+							threadBestEval = totalMoveCost;
+							++threadNeighborhoodCounter;
+						}
+						swap(threadOrder[i], threadOrder[j]);
+					} else if (relationMatrix[activitiesOrder[i]][activitiesOrder[j]] == 1)	{
+						break;
+					}
 				}
 
 				/* SHIFT MOVES */
@@ -328,9 +360,9 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 			delete[] threadStartTimesById;
 		}
 
-		/* CHECK BEST SOLUTION AND UPDATE TABU LIST */
+		delete[] currentScheduleStartTimes;
 
-		cout<<swapsWithoutPenalty<<"/"<<totalSwaps<<endl;
+		/* CHECK BEST SOLUTION AND UPDATE TABU LIST */
 
 		if (neighborhoodSize > 0)	{
 			#ifdef SIMPLE_TABU
@@ -380,6 +412,10 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 		tabu.goToNextIter();
 		#endif
 	}
+
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)
+		delete[] relationMatrix[activityId];
+	delete[] relationMatrix;
 
 	#ifdef __GNUC__
 	gettimeofday(&endTime, NULL);

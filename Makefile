@@ -10,13 +10,13 @@ SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoa
 
 # Pokud chcete ladit vykonost, pouzijte volbu -pg (gprof).
 ifdef DEBUG
-OPT = -O0 -g
+OPT = -O0 -g -std=c++0x
 else
-OPT = -pedantic -Wall -O4 -pipe -funsafe-math-optimizations
+OPT = -fopenmp -std=c++0x -pedantic -Wall -O4 -pipe -funsafe-math-optimizations
 endif
 
 # Linkování knihoven.. (-static-libstdc++)
-LIB_SMP = -fopenmp -std=c++0x
+#LIB_SMP = -fopenmp -std=c++0x
 
 .PHONY: build
 .PHONY: install
@@ -29,11 +29,11 @@ build: $(PROGRAM)
 
 # Zkompiluje program.
 $(PROGRAM): $(OBJ)
-	$(CPP) $(OBJ) $(LIB_SMP) -o $(PROGRAM) $(OPT)
+	$(CPP) $(OBJ) -o $(PROGRAM) $(OPT)
 
 # Vytvoří objekty pro sestavení programů.
 %.o: %.cpp
-	$(CPP) $(LIB_SMP) -c -o $@ $(OPT) $<
+	$(CPP) -c -o $@ $(OPT) $<
 
 # Nainstaluje program.
 install: build
