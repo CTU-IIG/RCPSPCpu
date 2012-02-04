@@ -261,9 +261,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 		size_t iterBestEval = UINT32_MAX;
 
 		uint32_t *currentScheduleStartTimes = new uint32_t[numberOfActivities];
-		uint32_t *currentScheduleStartTimesById = new uint32_t[numberOfActivities];
-		evaluateOrder(activitiesOrder, currentScheduleStartTimes, currentScheduleStartTimesById);
-		delete[] currentScheduleStartTimesById;
+		evaluateOrder(activitiesOrder, currentScheduleStartTimes);
 
 		#pragma omp parallel reduction(+:neighborhoodSize)
 		{
@@ -295,7 +293,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 						}
 					}
 
-					if ((currentScheduleStartTimes[i] != currentScheduleStartTimes[j]) && (precedenceFree == true))	{
+					if (((currentScheduleStartTimes[i] != currentScheduleStartTimes[j]) || (currentScheduleStartTimes[i-1] != currentScheduleStartTimes[i])) && (precedenceFree == true))	{
 						swap(threadOrder[i], threadOrder[j]);
 						#ifdef SIMPLE_TABU
 						bool isPossibleMove = tabu.isPossibleMove(i, j);
@@ -303,7 +301,8 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 						#ifdef ADVANCE_TABU
 						bool isPossibleMove = tabu.isPossibleMove(i, j, SWAP);
 						#endif
-						uint32_t totalMoveCost = evaluateOrder(threadOrder, NULL, threadStartTimesById);
+						uint32_t totalMoveCost = evaluateOrder(threadOrder);
+
 						if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
 							threadBestI = i; threadBestJ = j; threadBestMove = SWAP;
 							threadBestEval = totalMoveCost;

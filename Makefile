@@ -8,15 +8,14 @@ OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o SourcesLoad.o Tabu
 INC = InputReader.h SimpleTabuList.h ScheduleSolver.h SourcesLoad.h ConfigureRCPSP.h TabuList.h
 SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoad.cpp TabuList.cpp
 
-# Pokud chcete ladit vykonost, pouzijte volbu -pg (gprof).
+# Pokud chcete ladit vykonost, pouzijte volbu -pg (gprof). Linkování knihoven (-static-libstdc++).
 ifdef DEBUG
-OPT = -O0 -g -std=c++0x
+OPT = -O0 -g
+LIBS = -std=c++0x
 else
-OPT = -fopenmp -std=c++0x -pedantic -Wall -O4 -pipe -funsafe-math-optimizations
+OPT = -pedantic -Wall -march=native -O3 -pipe -funsafe-math-optimizations
+LIBS = -fopenmp -std=c++0x
 endif
-
-# Linkování knihoven.. (-static-libstdc++)
-#LIB_SMP = -fopenmp -std=c++0x
 
 .PHONY: build
 .PHONY: install
@@ -29,11 +28,11 @@ build: $(PROGRAM)
 
 # Zkompiluje program.
 $(PROGRAM): $(OBJ)
-	$(CPP) $(OBJ) -o $(PROGRAM) $(OPT)
+	$(CPP) $(LIBS) $(OPT) -o $(PROGRAM) $(OBJ)
 
 # Vytvoří objekty pro sestavení programů.
 %.o: %.cpp
-	$(CPP) -c -o $@ $(OPT) $<
+	$(CPP) $(LIBS) $(OPT) -c -o $@ $<
 
 # Nainstaluje program.
 install: build
@@ -41,7 +40,7 @@ install: build
 
 # Smaže soubory a program po překladu.
 clean:
-	rm -f *.o
+	rm -f *.o $(PROGRAM)
 
 # Odinstaluje program.
 uninstall:
