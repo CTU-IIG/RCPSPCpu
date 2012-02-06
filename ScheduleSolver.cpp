@@ -274,7 +274,6 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 			// Each thread own copy of current order.
 			uint32_t *threadOrder = new uint32_t[numberOfActivities], *outThreadOrder = threadOrder;
 			copy(activitiesOrder, activitiesOrder+numberOfActivities, outThreadOrder);
-			uint32_t *threadStartTimesById = new uint32_t[numberOfActivities];
 
 			/* HUGE COMPUTING... */
 			#pragma omp for schedule(dynamic)
@@ -320,22 +319,42 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 
 				for (uint32_t shift = minStartIdx; shift < maxStartIdx; ++shift)	{
 					if (shift > i+1 || shift < i-1)	{
-						makeShift(threadOrder, ((int32_t) shift)-((int32_t) i), i);
-						#ifdef SIMPLE_TABU
-						bool isPossibleMove = tabu.isPossibleMove(i, i);
-						#endif
-						#ifdef ADVANCE_TABU
-						bool isPossibleMove = tabu.isPossibleMove(i, i, SHIFT);
-						#endif
-						uint32_t scheduleLength = evaluateOrder(threadOrder, NULL, threadStartTimesById);
-						uint32_t precedencePenalty = computePrecedencePenalty(threadStartTimesById);
-						uint32_t totalMoveCost = scheduleLength+precedencePenalty;
-						if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
-							threadBestI = threadBestJ = i; threadBestMove = SHIFT;
-							threadBestEval = totalMoveCost; threadShiftDiff = shift;
-							++threadNeighborhoodCounter;
+
+						bool penaltyFree = true;
+						if (shift > i+1)	{
+							for (uint32_t k = i+1; k < shift+1; ++k)	{
+								if (relationMatrix[activitiesOrder[i]][activitiesOrder[k]] == 1)	{
+									penaltyFree = false;
+									shift = maxStartIdx;
+									break;
+								}
+							}
+						} else {
+							// shift < i-1
+							for (uint32_t k = shift; k < i; ++k)	{
+								if (relationMatrix[activitiesOrder[k]][activitiesOrder[i]] == 1)	{
+									penaltyFree = false;
+									break;
+								}
+							}
 						}
-						makeShift(threadOrder, ((int32_t) i)-((int32_t) shift), shift);
+
+						if (penaltyFree == true)	{
+							makeShift(threadOrder, ((int32_t) shift)-((int32_t) i), i);
+							#ifdef SIMPLE_TABU
+							bool isPossibleMove = tabu.isPossibleMove(i, i);
+							#endif
+							#ifdef ADVANCE_TABU
+							bool isPossibleMove = tabu.isPossibleMove(i, i, SHIFT);
+							#endif
+							uint32_t totalMoveCost = evaluateOrder(threadOrder);
+							if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
+								threadBestI = threadBestJ = i; threadBestMove = SHIFT;
+								threadBestEval = totalMoveCost; threadShiftDiff = shift;
+								++threadNeighborhoodCounter;
+							}
+							makeShift(threadOrder, ((int32_t) i)-((int32_t) shift), shift);
+						}
 					}
 				}
 			}
@@ -356,7 +375,6 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 			}
 
 			delete[] threadOrder;
-			delete[] threadStartTimesById;
 		}
 
 		delete[] currentScheduleStartTimes;
