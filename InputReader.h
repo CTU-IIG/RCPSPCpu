@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 class InputReader {
+
 	public:
 		InputReader() : numberOfActivities(0), totalNumberOfResources(0), activitiesDuration(NULL), activitiesRequiredResources(NULL),
 						activitiesSuccessors(NULL), activitiesNumberOfSuccessors(NULL), capacityOfResources(NULL) { }
@@ -25,11 +26,11 @@ class InputReader {
 
 		~InputReader() { freeInstanceData(); }
 
-	protected:
-		uint32_t strToNumber(const std::string& number)	const;
-
 	private:
 
+		void allocateBaseArrays();
+		uint32_t strToNumber(const std::string& number)	const;
+		std::string numberToStr(const uint32_t& number) const;
 		void freeInstanceData();
 
 		InputReader(const InputReader&);

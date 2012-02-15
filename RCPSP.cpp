@@ -1,4 +1,5 @@
 #include <iostream>
+#include <typeinfo>
 #include <string>
 #include <sstream>
 #include <stdexcept>
@@ -17,8 +18,10 @@ T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 		istringstream istr(numStr, istringstream::in);
 		if (!(istr>>value))
 			throw invalid_argument("Cannot read argument! (option \""+option+"\")");
-		if (value < 0)
+		if (value < 0 || (!numStr.empty() && numStr[0] == '-'))
 			throw range_error("Argument value cannot be negative!");
+		if (typeid(value) == typeid(double) && (value < 0 || value > 1))
+			throw range_error("Invalid range of double! (correct range 0-1)");
 		return value;
 	} else {
 		throw invalid_argument("Option \""+option+"\" require argument!");

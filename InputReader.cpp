@@ -12,7 +12,7 @@ using namespace std;
 void InputReader::readFromFile(const string& filename) {
 	ifstream IN(filename.c_str());	
 	if (!IN)
-		throw runtime_error("InputReader::readFromFIle: Cannot open input file!");
+		throw runtime_error("InputReader::readFromFile: Cannot open input file \""+filename+"\"!");
 
 	readFromStream(IN);
 	IN.close();
@@ -44,10 +44,15 @@ void InputReader::readFromStream(istream& IN) {
 							parsedNumber.push_back(*it);			
 					}
 					totalNumberOfResources = strToNumber(parsedNumber);
+					if (parsedNumber.empty() || totalNumberOfResources == 0)
+						throw runtime_error("InputReader::readFromStream: Cannot read number of resources!");
 				}
 
 				if ((sit = search(readedLine.begin(), readedLine.end(), searchPattern2.begin(), searchPattern2.end())) != readedLine.end())	{
-					IN>>shred>>numberOfActivities;
+					if (!(IN>>shred>>numberOfActivities))
+						throw runtime_error("InputReader::readFromStream: Cannot read number of activities!");
+					if (numberOfActivities == 0)
+						throw runtime_error("InputReader::readFromStream: Number of activities is number greater than zero!");
 					numberOfActivities += 2;
 				}
 
@@ -56,23 +61,26 @@ void InputReader::readFromStream(istream& IN) {
 				}
 			}
 
-			activitiesDuration = new uint32_t[numberOfActivities];
-			activitiesRequiredResources = new uint32_t*[numberOfActivities];
-			activitiesSuccessors = new uint32_t*[numberOfActivities];
-			activitiesNumberOfSuccessors = new uint32_t[numberOfActivities];
-			capacityOfResources = new uint32_t[totalNumberOfResources];
+			if (numberOfActivities == 0 || totalNumberOfResources == 0)
+				throw runtime_error("InputReader::readFromStream: Invalid format of input file!");
+
+			allocateBaseArrays();
 
 			// Read succesors.
 			for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-				size_t numberOfSuccessors;
-				IN>>shred>>shred>>numberOfSuccessors;
+				uint32_t numberOfSuccessors, testId;
+				if (!(IN>>testId>>shred>>numberOfSuccessors))
+					throw runtime_error("InputReader::readFromStream: Cannot read successors of activity "+numberToStr(activityId+1)+"!");
+				if (activityId+1 != testId)
+					throw runtime_error("InputReader::readFromStream: Probably inconsistence of instance file!\nCheck activity ID failed.");
 
 				activitiesNumberOfSuccessors[activityId] = numberOfSuccessors;
 				activitiesSuccessors[activityId] = new uint32_t[numberOfSuccessors];
 
 				uint32_t successor;
 				for (uint32_t i = 0; i < numberOfSuccessors; ++i)	{
-					IN>>successor;
+					if (!(IN>>successor))
+						throw runtime_error("InputReader::readFromStream: Cannot read next ("+numberToStr(i+1)+") successor of activity "+numberToStr(activityId+1)+"!");
 					activitiesSuccessors[activityId][i] = successor-1;
 				}
 			}
@@ -82,14 +90,18 @@ void InputReader::readFromStream(istream& IN) {
 
 			// Read resource requirements.
 			for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-				uint32_t activityDuration;
-				IN>>shred>>shred>>activityDuration;
+				uint32_t activityDuration, testId;
+				if (!(IN>>testId>>shred>>activityDuration))
+					throw runtime_error("InputReader::readFromStream: Invalid read of activity requirement!");
+				if (activityId+1 != testId)
+					throw runtime_error("InputReader::readFromStream: Probably inconsistence of instance file!\nCheck activity ID failed.");
 
 				activitiesDuration[activityId] = activityDuration;
-				activitiesRequiredResources[activityId] = new uint32_t[totalNumberOfResources];
 
+				uint32_t unitsReq; 
 				for (uint32_t resourceId = 0; resourceId < totalNumberOfResources; ++resourceId)	{
-					uint32_t unitsReq; IN>>unitsReq;
+					if (!(IN>>unitsReq))
+						throw runtime_error("InputReader::readFromStream: Cannot read next activity requirement ("+numberToStr(resourceId+1)+") of activity "+numberToStr(activityId+1)+"!");
 					activitiesRequiredResources[activityId][resourceId] = unitsReq;
 				}
 			}
@@ -99,42 +111,51 @@ void InputReader::readFromStream(istream& IN) {
 
 			// Read capacity of resources.
 			for (uint32_t resourceId = 0; resourceId < totalNumberOfResources; ++resourceId)	{
-				uint32_t resourceCapacity; IN>>resourceCapacity;
+				uint32_t resourceCapacity;
+				if (!(IN>>resourceCapacity))
+					throw runtime_error("InputReader::readFromStream: Invalid read of resource capacity!\nResource ID is "+numberToStr(resourceId+1)+".");
 				capacityOfResources[resourceId] = resourceCapacity;
 			}
 		} else if (!readedLine.empty())	{
 			/* PROGEN/MAX 1.0 FORMAT */
-			IN>>numberOfActivities>>totalNumberOfResources>>shred>>shred;
+			if (!(IN>>numberOfActivities>>totalNumberOfResources>>shred>>shred))
+				throw runtime_error("InputReader::readFromStream: Cannot read number of activities and number of resource!\nCheck file format.");
+			if (numberOfActivities == 0 || totalNumberOfResources == 0)
+				throw runtime_error("InputReader::readFromStream: Invalid value of number of activities or number of resources!");
 			numberOfActivities += 2;
 
-			activitiesDuration = new uint32_t[numberOfActivities];
-			activitiesRequiredResources = new uint32_t*[numberOfActivities];
-			activitiesSuccessors = new uint32_t*[numberOfActivities];
-			activitiesNumberOfSuccessors = new uint32_t[numberOfActivities];
-			capacityOfResources = new uint32_t[totalNumberOfResources];
+			allocateBaseArrays();
 
 			// Read activity successors.
 			for (uint32_t actId = 0; actId < numberOfActivities; ++actId)	{
-				uint32_t successor = 0;
-				size_t numberOfSuccessors = 0;
-				IN>>shred>>shred>>numberOfSuccessors;
+				uint32_t successor = 0, numberOfSuccessors = 0, testId = 0;
+				if (!(IN>>testId>>shred>>numberOfSuccessors))
+					throw runtime_error("InputReader::readFromStream: Cannot read number of successors of activity "+numberToStr(actId)+"!");
+				if (actId != testId)
+					throw runtime_error("InputReader::readFromStream: Probably inconsistence of instance file!\nCheck activity ID failed.");
+
 				activitiesNumberOfSuccessors[actId] = numberOfSuccessors;
 				activitiesSuccessors[actId] = new uint32_t[numberOfSuccessors];
 				for (uint32_t k = 0; k < numberOfSuccessors; ++k)	{
-					IN>>successor;
+					if (!(IN>>successor))
+						throw runtime_error("InputReader::readFromStream: Cannot read next ("+numberToStr(k+1)+") successor of activity "+numberToStr(actId)+"!");
 					activitiesSuccessors[actId][k] = successor;
 				}
 			}
 
 			// Read activities resources requirement.
 			for (uint32_t actId = 0; actId < numberOfActivities; ++actId)	{
-				uint32_t resourceReq = 0;
-				uint32_t activityDuration = 0;
-				IN>>shred>>shred>>activityDuration;
+				uint32_t resourceReq = 0, activityDuration = 0, testId = 0;
+				if (!(IN>>testId>>shred>>activityDuration))
+					throw runtime_error("InputReader::readFromStream: Invalid read of activity requirement!");
+				if (actId != testId)
+					throw runtime_error("InputReader::readFromStream: Probably inconsistence of instance file!\nCheck activity ID failed.");
+
 				activitiesDuration[actId] = activityDuration;
-				activitiesRequiredResources[actId] = new uint32_t[totalNumberOfResources];
+
 				for (uint32_t r = 0; r < totalNumberOfResources; ++r)	{
-					IN>>resourceReq;	
+					if (!(IN>>resourceReq))
+						throw runtime_error("InputReader::readFromStream: Cannot read next activity requirement ("+numberToStr(r)+") of activity "+numberToStr(actId)+"!");
 					activitiesRequiredResources[actId][r] = resourceReq;
 				}
 			}	
@@ -142,9 +163,20 @@ void InputReader::readFromStream(istream& IN) {
 			// Read resources capacity.
 			for (uint32_t r = 0; r < totalNumberOfResources; ++r)	{
 				uint32_t resourceCapacity = 0;
-				IN>>resourceCapacity;
+				if (!(IN>>resourceCapacity))
+					throw runtime_error("InputReader::readFromStream: Invalid read of resource capacity!\nResource ID is "+numberToStr(r)+".");
 				capacityOfResources[r] = resourceCapacity;
 			}
+		} else {
+			throw runtime_error("InputReader::readFromStream: Empty instance file??");
+		}
+	}
+
+	// Check if resources are sufficient for activities.
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
+		for (uint32_t resourceId = 0; resourceId < totalNumberOfResources; ++resourceId)	{
+			if (activitiesRequiredResources[activityId][resourceId] > capacityOfResources[resourceId])
+				throw runtime_error("InputReader::readFromStream: Suggested resources are insufficient for activities requirement!");
 		}
 	}
 }
@@ -171,16 +203,34 @@ void InputReader::printInstance(ostream& OUT)	const	{
 	OUT<<endl;
 }
 
+void InputReader::allocateBaseArrays()	{
+	activitiesDuration = new uint32_t[numberOfActivities];
+	activitiesSuccessors = new uint32_t*[numberOfActivities];
+	activitiesNumberOfSuccessors = new uint32_t[numberOfActivities];
+	capacityOfResources = new uint32_t[totalNumberOfResources];
+	activitiesRequiredResources = new uint32_t*[numberOfActivities];
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)
+		activitiesRequiredResources[activityId] = new uint32_t[totalNumberOfResources];
+}
+
 uint32_t InputReader::strToNumber(const string& number)	const {
-	istringstream istr(number,istringstream::in);
-	uint32_t ret; istr>>ret;
+	istringstream istr(number, istringstream::in);
+	uint32_t ret = 0; istr>>ret;
 	return ret;
+}
+
+string InputReader::numberToStr(const uint32_t& number) const {
+	stringstream ss;
+	ss<<number;
+	return ss.str();
 }
 
 void InputReader::freeInstanceData()	{
 	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-		delete[] activitiesSuccessors[activityId];
-		delete[] activitiesRequiredResources[activityId];
+		if (activitiesSuccessors != NULL)
+			delete[] activitiesSuccessors[activityId];
+		if (activitiesRequiredResources != NULL)
+			delete[] activitiesRequiredResources[activityId];
 	}
 
 	delete[] activitiesSuccessors;	
