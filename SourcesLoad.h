@@ -13,10 +13,10 @@
 
 class SourcesLoad {
 	public:
-		SourcesLoad(const uint32_t numRes, uint32_t *capRes);
+		SourcesLoad(const uint32_t& numRes, const uint32_t * const& capRes);
 
-		uint32_t getEarliestStartTime(uint32_t *activityResourceRequirement) const;
-		void addActivity(uint32_t activityStart, uint32_t activityStop, uint32_t *activityRequirement);
+		uint32_t getEarliestStartTime(const uint32_t * const& activityResourceRequirement) const;
+		void addActivity(const uint32_t& activityStart, const uint32_t& activityStop, const uint32_t * const& activityRequirement);
 		void printCurrentState(std::ostream& OUT = std::cout) const;
 
 		~SourcesLoad();
@@ -30,9 +30,9 @@ class SourcesLoad {
 
 
 		// Total number of resources.
-		uint32_t numberOfResources;
+		const uint32_t numberOfResources;
 		// Capacity of resources.
-		uint32_t *capacityOfResources;
+		const uint32_t * const capacityOfResources;
 		// Current state of resources.
 		uint32_t **resourcesLoad;
 		// Helper arrays.

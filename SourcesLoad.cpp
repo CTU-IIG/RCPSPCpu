@@ -4,7 +4,7 @@
 
 using namespace std;
 
-SourcesLoad::SourcesLoad(const uint32_t numRes, uint32_t *capRes) : numberOfResources(numRes), capacityOfResources(capRes)	{
+SourcesLoad::SourcesLoad(const uint32_t& numRes, const uint32_t * const& capRes) : numberOfResources(numRes), capacityOfResources(capRes)	{
 	uint32_t maxCapacity = 0;
 	resourcesLoad = new uint32_t*[numberOfResources];
 
@@ -20,7 +20,7 @@ SourcesLoad::SourcesLoad(const uint32_t numRes, uint32_t *capRes) : numberOfReso
 	memset(reqItems, 0, sizeof(uint32_t)*maxCapacity);
 }
 
-uint32_t SourcesLoad::getEarliestStartTime(uint32_t *activityResourceRequirement)	const 	{
+uint32_t SourcesLoad::getEarliestStartTime(const uint32_t * const& activityResourceRequirement)	const 	{
 	uint32_t bestStart = 0;
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
 		uint32_t activityRequirement = activityResourceRequirement[resourceId];
@@ -30,7 +30,7 @@ uint32_t SourcesLoad::getEarliestStartTime(uint32_t *activityResourceRequirement
 	return bestStart;
 }
 
-void SourcesLoad::addActivity(uint32_t activityStart, uint32_t activityStop, uint32_t *activityRequirement)	{
+void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& activityStop, const uint32_t * const& activityRequirement)	{
 	#if DEBUG_SOURCES == 1
 	map<uint32_t,int32_t*>::iterator mit;
 	if ((mit = peaks.find(activityStart)) == peaks.end())	{

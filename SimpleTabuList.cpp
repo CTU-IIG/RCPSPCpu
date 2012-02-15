@@ -2,7 +2,7 @@
 
 using namespace std;
 
-SimpleTabuList::SimpleTabuList(const uint32_t numberOfActivities, const uint32_t length) : curIdx(0), tabuLength(length), totalNumberOfActivities(numberOfActivities)	{
+SimpleTabuList::SimpleTabuList(const uint32_t& numberOfActivities, const uint32_t& length) : curIdx(0), tabuLength(length), totalNumberOfActivities(numberOfActivities)	{
 	/* INIT SEARCH ARRAY */
 	tabuSearch = new bool*[numberOfActivities];
 	for (bool **ptr1 = tabuSearch; ptr1 < tabuSearch+numberOfActivities; ++ptr1)	{
@@ -18,20 +18,20 @@ SimpleTabuList::SimpleTabuList(const uint32_t numberOfActivities, const uint32_t
 	}
 }
 
-bool SimpleTabuList::isPossibleMove(const uint32_t i, const uint32_t j)	const	{
-	if (tabuSearch[i][j] == false && tabuSearch[j][i] == false)
+bool SimpleTabuList::isPossibleMove(const uint32_t& i, const uint32_t& j, const MoveType&)	const	{
+	if (tabuSearch[i][j] == false)
 		return true;
 	else
 		return false;
 }
 
-void SimpleTabuList::addTurnToTabuList(const uint32_t i, const uint32_t j)	{
+void SimpleTabuList::addTurnToTabuList(const uint32_t& i, const uint32_t& j, const MoveType&)	{
 	if (tabu[curIdx].i != -1 && tabu[curIdx].j != -1)
-		tabuSearch[tabu[curIdx].i][tabu[curIdx].j] = tabuSearch[tabu[curIdx].j][tabu[curIdx].i] = false;
+		tabuSearch[tabu[curIdx].i][tabu[curIdx].j] = false;
 
 	tabu[curIdx].i = i;
 	tabu[curIdx].j = j;
-	tabuSearch[i][j] = tabuSearch[j][i] = true;
+	tabuSearch[i][j] = true;
 
 	curIdx = (curIdx+1) % tabuLength;
 }

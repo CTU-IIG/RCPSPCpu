@@ -13,18 +13,30 @@
 
 #include "ScheduleSolver.h"
 #include "SourcesLoad.h"
-#include "ConfigureRCPSP.h"
+#include "SimpleTabuList.h"
+#include "AdvanceTabuList.h"
 
 using namespace std;
 
-ScheduleSolver::ScheduleSolver(uint32_t resNum, uint32_t *capRes, uint32_t actNum, uint32_t *actDur, uint32_t **actSuc, uint32_t *actNumSuc, uint32_t **actRes, uint32_t maxIter)
-	: numberOfResources(resNum), capacityOfResources(capRes), numberOfActivities(actNum), activitiesDuration(actDur), activitiesSuccessors(actSuc), numberOfSuccessors(actNumSuc),
-	  activitesResources(actRes), maxIterToDiversification(maxIter), tabu(actNum, SIMPLE_TABU_LIST_SIZE), totalRunTime(0)	{
+ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), totalRunTime(0) 	{
+	// Copy pointers to data of instance.
+	numberOfResources = rcpspData.getNumberOfResources();
+	capacityOfResources = rcpspData.getCapacityOfResources();
+	numberOfActivities = rcpspData.getNumberOfActivities();
+	activitiesDuration = rcpspData.getActivitiesDuration();
+	numberOfSuccessors = rcpspData.getActivitiesNumberOfSuccessors();
+	activitiesSuccessors = rcpspData.getActivitiesSuccessors();
+	activitiesResources = rcpspData.getActivitiesResources();
 
-	activitiesOrder = new uint32_t[numberOfActivities];
-	diversificationOrder = new uint32_t[numberOfActivities];
-	bestScheduleOrder = new uint32_t[numberOfActivities];
+	// Create desired type of tabu list.
+	if (ConfigureRCPSP::TABU_LIST_TYPE == SIMPLE_TABU)
+		tabu = new AdvanceTabuList(ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST);
+	else if (ConfigureRCPSP::TABU_LIST_TYPE == ADVANCE_TABU)
+		tabu = new SimpleTabuList(numberOfActivities, ConfigureRCPSP::SIMPLE_TABU_LIST_SIZE);
+	else
+		throw invalid_argument("ScheduleSolver::ScheduleSolver: Invalid type of tabu list!");
 
+	// Create initial solution and fill required data structures.
 	createInitialSolution();
 }
 
@@ -58,24 +70,14 @@ void ScheduleSolver::createInitialSolution()	{
 	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
 		activitiesPredecessors[activityId] -= numberOfPredecessors[activityId];
 	}
-/*
-	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-		cout<<"Activity "<<activityId+1<<":";
-		for (uint32_t predIdx = 0; predIdx < numberOfPredecessors[activityId]; ++predIdx)	{
-			cout<<" "<<activitiesPredecessors[activityId][predIdx]+1;
-		}
-		cout<<endl;
-	}
-*/
+
 
 	/* CREATE INIT ORDER OF ACTIVITIES */
-
 
 	uint32_t deep = 0;
 	uint32_t *levels = new uint32_t[numberOfActivities];
 	memset(levels, 0, sizeof(uint32_t)*numberOfActivities);
 
-		
 	// Add first task with id 0. (currentLevel contain ID's)
 	uint8_t *currentLevel = new uint8_t[numberOfActivities];
 	uint8_t *newCurrentLevel = new uint8_t[numberOfActivities];
@@ -103,12 +105,9 @@ void ScheduleSolver::createInitialSolution()	{
 		++deep;
 	}
 
-/*	
-	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-		cout<<"Activity "<<activityId+1<<": "<<levels[activityId]<<endl;
-	}
-*/
-	
+	activitiesOrder = new uint32_t[numberOfActivities];
+	bestScheduleOrder = new uint32_t[numberOfActivities];
+
 	// Current schedule index.
 	uint32_t schedIdx = 0;
 	for (uint32_t curDeep = 0; curDeep < deep; ++curDeep)	{
@@ -118,18 +117,31 @@ void ScheduleSolver::createInitialSolution()	{
 		}
 	}
 
-	uint32_t *outDiversification = diversificationOrder, *outBestSchedule = bestScheduleOrder;
+	uint32_t *outBestSchedule = bestScheduleOrder;
 	copy(activitiesOrder, activitiesOrder+numberOfActivities, outBestSchedule);
-	copy(activitiesOrder, activitiesOrder+numberOfActivities, outDiversification);	
-
 	costOfBestSchedule = evaluateOrder(activitiesOrder);
+
+
+	/* PRECOMPUTE MATRIX OF SUCCESSORS */
+
+	relationMatrix = new int8_t*[numberOfActivities];
+	for (int8_t** ptr = relationMatrix; ptr < relationMatrix+numberOfActivities; ++ptr)	{
+		*ptr = new int8_t[numberOfActivities];
+		memset(*ptr, 0, sizeof(int8_t)*numberOfActivities);
+	}
+
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
+		for (uint32_t j = 0; j < numberOfSuccessors[activityId]; ++j)	{
+			relationMatrix[activityId][activitiesSuccessors[activityId][j]] = 1;
+		}
+	}
 
 	delete[] levels;
 	delete[] currentLevel;
 	delete[] newCurrentLevel;
 }
 
-uint32_t ScheduleSolver::evaluateOrder(const uint32_t *order, uint32_t *startTimesWriter, uint32_t *startTimesWriterById)	const	{
+uint32_t ScheduleSolver::evaluateOrder(const uint32_t * const& order, uint32_t *startTimesWriter, uint32_t *startTimesWriterById)	const	{
 	bool freeMem = false;
 	uint32_t start = 0, scheduleLength = 0;
 	SourcesLoad load(numberOfResources,capacityOfResources);
@@ -146,8 +158,8 @@ uint32_t ScheduleSolver::evaluateOrder(const uint32_t *order, uint32_t *startTim
 			start = max(startTimesWriterById[predecessorId]+activitiesDuration[predecessorId], start);
 		}
 
-		start = max(load.getEarliestStartTime(activitesResources[activityId]), start);
-		load.addActivity(start, start+activitiesDuration[activityId], activitesResources[activityId]);
+		start = max(load.getEarliestStartTime(activitiesResources[activityId]), start);
+		load.addActivity(start, start+activitiesDuration[activityId], activitiesResources[activityId]);
 		scheduleLength = max(scheduleLength, start+activitiesDuration[activityId]);
 
 		if (startTimesWriter != NULL)
@@ -162,7 +174,7 @@ uint32_t ScheduleSolver::evaluateOrder(const uint32_t *order, uint32_t *startTim
 	return scheduleLength;
 }
 
-uint32_t ScheduleSolver::computePrecedencePenalty(const uint32_t *startTimesById)	const	{
+uint32_t ScheduleSolver::computePrecedencePenalty(const uint32_t * const& startTimesById)	const	{
 	uint32_t penalty = 0;
 	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
 		for (uint32_t j = 0; j < numberOfSuccessors[activityId]; ++j)	{
@@ -171,10 +183,10 @@ uint32_t ScheduleSolver::computePrecedencePenalty(const uint32_t *startTimesById
 				penalty += startTimesById[activityId]+activitiesDuration[activityId]-startTimesById[successorId];
 		}
 	}
-	return PRECEDENCE_PENALTY*penalty;
+	return penalty;
 }
 
-void ScheduleSolver::printSchedule(uint32_t *scheduleOrder, bool verbose, ostream& OUT)	const	{
+void ScheduleSolver::printSchedule(const uint32_t * const& scheduleOrder, bool verbose, ostream& OUT)	const	{
 	uint32_t *startTimes = new uint32_t[numberOfActivities];
 	uint32_t *startTimesById = new uint32_t[numberOfActivities];
 
@@ -214,10 +226,16 @@ ScheduleSolver::~ScheduleSolver()	{
 		delete[] activitiesPredecessors[actId];
 	}
 	delete[] activitiesPredecessors;
+
 	delete[] numberOfPredecessors;
 	delete[] activitiesOrder;
-	delete[] diversificationOrder;
 	delete[] bestScheduleOrder;
+
+	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)
+		delete[] relationMatrix[activityId];
+	delete[] relationMatrix;
+
+	delete tabu;
 }
 
 
@@ -234,25 +252,6 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 
 	srand(time(NULL));
 	uint32_t numberOfIterSinceBest = 0;
-
-	// Prepare matrix of successors (~1) / predecessors (~-1).
-	int8_t ** relationMatrix = new int8_t*[numberOfActivities];
-	for (int8_t** ptr = relationMatrix; ptr < relationMatrix+numberOfActivities; ++ptr)	{
-		*ptr = new int8_t[numberOfActivities];
-		memset(*ptr, 0, sizeof(int8_t)*numberOfActivities);
-	}
-
-	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-		for (uint32_t j = 0; j < numberOfSuccessors[activityId]; ++j)	{
-			relationMatrix[activityId][activitiesSuccessors[activityId][j]] = 1;
-		}
-	}
-
-	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
-		for (uint32_t j = 0; j < numberOfPredecessors[activityId]; ++j)	{
-			relationMatrix[activityId][activitiesPredecessors[activityId][j]] = -1;
-		}
-	}
 
 	for (uint32_t iter = 0; iter < maxIter; ++iter)	{
 		size_t neighborhoodSize = 0;
@@ -280,33 +279,24 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 			for (uint32_t i = 1; i < numberOfActivities-1; ++i)	{
 
 				/* SWAP MOVES */
-				uint32_t u = min(i+1+SWAP_RANGE, numberOfActivities-1);
+				uint32_t u = min(i+1+ConfigureRCPSP::SWAP_RANGE, numberOfActivities-1);
 				for (uint32_t j = i+1; j < u; ++j)	{
 
 					// Check if current selected swap is precedence penalty free.
-					bool precedenceFree = true;
-					for (uint32_t k = i; k < j; ++k)	{
-						if (relationMatrix[activitiesOrder[k]][activitiesOrder[j]] == 1)	{
-							precedenceFree = false;
-							break;
-						}
-					}
+					bool precedenceFree = checkSwapPrecedencePenalty(i, j);
 
 					if (((currentScheduleStartTimes[i] != currentScheduleStartTimes[j]) || (currentScheduleStartTimes[i-1] != currentScheduleStartTimes[i])) && (precedenceFree == true))	{
 						swap(threadOrder[i], threadOrder[j]);
-						#ifdef SIMPLE_TABU
-						bool isPossibleMove = tabu.isPossibleMove(i, j);
-						#endif
-						#ifdef ADVANCE_TABU
-						bool isPossibleMove = tabu.isPossibleMove(i, j, SWAP);
-						#endif
+
 						uint32_t totalMoveCost = evaluateOrder(threadOrder);
+						bool isPossibleMove = tabu->isPossibleMove(i, j, SWAP);
 
 						if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
 							threadBestI = i; threadBestJ = j; threadBestMove = SWAP;
 							threadBestEval = totalMoveCost;
 							++threadNeighborhoodCounter;
 						}
+
 						swap(threadOrder[i], threadOrder[j]);
 					} else if (relationMatrix[activitiesOrder[i]][activitiesOrder[j]] == 1)	{
 						break;
@@ -314,8 +304,8 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 				}
 
 				/* SHIFT MOVES */
-				uint32_t minStartIdx = max(1, ((int32_t) i)-SHIFT_RANGE);
-				uint32_t maxStartIdx = min(i+1+SHIFT_RANGE, numberOfActivities-1);
+				uint32_t minStartIdx = max(1, ((int32_t) i)-((int32_t) ConfigureRCPSP::SHIFT_RANGE));
+				uint32_t maxStartIdx = min(i+1+ConfigureRCPSP::SHIFT_RANGE, numberOfActivities-1);
 
 				for (uint32_t shift = minStartIdx; shift < maxStartIdx; ++shift)	{
 					if (shift > i+1 || shift < i-1)	{
@@ -341,18 +331,16 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 
 						if (penaltyFree == true)	{
 							makeShift(threadOrder, ((int32_t) shift)-((int32_t) i), i);
-							#ifdef SIMPLE_TABU
-							bool isPossibleMove = tabu.isPossibleMove(i, i);
-							#endif
-							#ifdef ADVANCE_TABU
-							bool isPossibleMove = tabu.isPossibleMove(i, i, SHIFT);
-							#endif
+
 							uint32_t totalMoveCost = evaluateOrder(threadOrder);
+							bool isPossibleMove = tabu->isPossibleMove(i, shift, SHIFT);
+
 							if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
 								threadBestI = threadBestJ = i; threadBestMove = SHIFT;
 								threadBestEval = totalMoveCost; threadShiftDiff = shift;
 								++threadNeighborhoodCounter;
 							}
+
 							makeShift(threadOrder, ((int32_t) i)-((int32_t) shift), shift);
 						}
 					}
@@ -382,16 +370,10 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 		/* CHECK BEST SOLUTION AND UPDATE TABU LIST */
 
 		if (neighborhoodSize > 0)	{
-			#ifdef SIMPLE_TABU
-			if (tabu.isPossibleMove(iterBestI, iterBestJ))	{
-				tabu.addTurnToTabuList(iterBestI, iterBestJ);
-			}
-			#endif
-			#ifdef ADVANCE_TABU
-			if (tabu.isPossibleMove(iterBestI, iterBestJ, iterBestMove))	{
-				tabu.addTurnToTabuList(iterBestI, iterBestJ, iterBestMove);
-			}
-			#endif
+			if ((iterBestMove == SWAP) && (tabu->isPossibleMove(iterBestI, iterBestJ, SWAP) == true))
+				tabu->addTurnToTabuList(iterBestI, iterBestJ, SWAP);
+			else if ((iterBestMove == SHIFT) && (tabu->isPossibleMove(iterBestI, iterShiftDiff, SHIFT) == true))
+				tabu->addTurnToTabuList(iterBestI, iterShiftDiff, SHIFT);
 		} else {
 			clog<<"Expanded neighborhood is empty! Prematurely ending..."<<endl;
 			break;
@@ -410,29 +392,23 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 		}
 
 		if (iterBestEval < costOfBestSchedule)	{
-		//	cout<<"New best cost "<<iter<<": "<<iterBestEval<<endl;
+			cerr<<"best cost: "<<iterBestEval<<" ["<<iter<<"]"<<endl;
 			costOfBestSchedule = iterBestEval;
 			numberOfIterSinceBest = 0;
-			#ifdef ADVANCE_TABU
-			tabu.bestSolutionFound();
-			#endif
+			tabu->bestSolutionFound();
 			uint32_t *outBestSchedule = bestScheduleOrder;
 			copy(activitiesOrder, activitiesOrder+numberOfActivities, outBestSchedule);
 		} else {
 			++numberOfIterSinceBest;
 		}
 
-		if (numberOfIterSinceBest > maxIterToDiversification)	{
+		if (numberOfIterSinceBest > ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST)	{
+			makeDiversification();
 			numberOfIterSinceBest = 0;
 		}
-		#ifdef ADVANCE_TABU
-		tabu.goToNextIter();
-		#endif
-	}
 
-	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)
-		delete[] relationMatrix[activityId];
-	delete[] relationMatrix;
+		tabu->goToNextIter();
+	}
 
 	#ifdef __GNUC__
 	gettimeofday(&endTime, NULL);
@@ -444,8 +420,22 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 	#endif
 }
 
+bool ScheduleSolver::checkSwapPrecedencePenalty(uint32_t i, uint32_t j) const	{
+	if (i > j) swap(i,j);
+	for (uint32_t k = i; k < j; ++k)	{
+		if (relationMatrix[activitiesOrder[k]][activitiesOrder[j]] == 1)	{
+			return false;
+		}
+	}
+	for (uint32_t k = i+1; k <= j; ++k)	{
+		if (relationMatrix[activitiesOrder[i]][activitiesOrder[k]] == 1)	{
+			return false;
+		}
+	}
+	return true;
+}
 
-void ScheduleSolver::makeShift(uint32_t *order, int32_t diff, uint32_t baseIdx)	const	{
+void ScheduleSolver::makeShift(uint32_t * const& order, const int32_t& diff, const uint32_t& baseIdx)	const	{
 	if (diff > 0)	{
 		for (uint32_t i = baseIdx; i < baseIdx+diff; ++i)	{
 			swap(order[i], order[i+1]);	
@@ -456,5 +446,18 @@ void ScheduleSolver::makeShift(uint32_t *order, int32_t diff, uint32_t baseIdx)	
 		}
 	}
 	return;
+}
+
+void ScheduleSolver::makeDiversification()	{
+	uint32_t performedSwaps = 0;
+	while (performedSwaps < ConfigureRCPSP::DIVERSIFICATION_SWAPS)	{
+		uint32_t i = (rand() % (numberOfActivities-2)) + 1;
+		uint32_t j = (rand() % (numberOfActivities-2)) + 1;
+
+		if ((i != j) && (checkSwapPrecedencePenalty(i, j) == true))	{
+			swap(activitiesOrder[i], activitiesOrder[j]);
+			++performedSwaps;
+		}
+	}
 }
 

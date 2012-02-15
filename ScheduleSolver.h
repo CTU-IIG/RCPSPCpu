@@ -3,18 +3,14 @@
 
 #include <iostream>
 #include "ConfigureRCPSP.h"
-#ifdef SIMPLE_TABU
-#include "SimpleTabuList.h"
-#endif
-#ifdef ADVANCE_TABU
+#include "InputReader.h"
 #include "TabuList.h"
-#endif
 
 class ScheduleSolver {
 	public:
-		ScheduleSolver(uint32_t resNum, uint32_t *capRes, uint32_t actNum, uint32_t *actDur, uint32_t **actSuc, uint32_t *actNumSuc, uint32_t **actRes, uint32_t maxIter);
+		ScheduleSolver(const InputReader& rcpspData);
 
-		void solveSchedule(const uint32_t& maxIter = 100);
+		void solveSchedule(const uint32_t& maxIter = ConfigureRCPSP::NUMBER_OF_ITERATIONS);
 		void printBestSchedule(bool verbose = true, std::ostream& OUT = std::cout) const;
 
 		~ScheduleSolver();
@@ -22,10 +18,12 @@ class ScheduleSolver {
 	protected:
 
 		void createInitialSolution();
-		uint32_t evaluateOrder(const uint32_t *order, uint32_t *startTimesWriter = NULL, uint32_t *startTimesWriterById = NULL) const;
-		uint32_t computePrecedencePenalty(const uint32_t *startTimesById) const;
-		void printSchedule(uint32_t *scheduleOrder, bool verbose = true, std::ostream& OUT = std::cout) const;
-		void makeShift(uint32_t *order, int32_t diff, uint32_t baseIdx)	const;
+		uint32_t evaluateOrder(const uint32_t * const& order, uint32_t *startTimesWriter = NULL, uint32_t *startTimesWriterById = NULL) const;
+		uint32_t computePrecedencePenalty(const uint32_t * const& startTimesById) const;
+		void printSchedule(const uint32_t * const& scheduleOrder, bool verbose = true, std::ostream& OUT = std::cout) const;
+		bool checkSwapPrecedencePenalty(uint32_t i, uint32_t j) const;
+		void makeShift(uint32_t * const& order, const int32_t& diff, const uint32_t& baseIdx)	const;
+		void makeDiversification();
 
 	private:
 
@@ -54,28 +52,21 @@ class ScheduleSolver {
 		// Number of predecessors;
 		uint32_t *numberOfPredecessors;
 		// Activities required sources.
-		uint32_t **activitesResources;
-		
+		uint32_t **activitiesResources;
+		// Matrix of successors. (if matrix(i,j) == 1 then "Exist precedence edge between activities i and j")
+		int8_t **relationMatrix;
 
 		/* MUTABLE DATA */	
 
 		// Current activities order.
 		uint32_t *activitiesOrder;
-		// Order that is used when diversification is performed.
-		uint32_t *diversificationOrder;
-		// Max iter that are allowed than diversification is called.
-		uint32_t maxIterToDiversification;
 		// Best schedule order.
 		uint32_t *bestScheduleOrder;
 		// Cost of best schedule.
 		uint32_t costOfBestSchedule;
 		// Tabu list instance.
-		#ifdef SIMPLE_TABU
-		SimpleTabuList tabu;
-		#endif
-		#ifdef ADVANCE_TABU
-		TabuList tabu;
-		#endif
+		TabuList *tabu;
+		// Purpose of this variable is to remeber total time.
 		double totalRunTime;
 };
 

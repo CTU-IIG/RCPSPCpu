@@ -10,32 +10,30 @@
 #include <utility>
 #include <vector>
 #include <stdint.h>
-#include "TabuList.h"
+#include "AdvanceTabuList.h"
 
 using namespace std;
 
-TabuList::TabuList(const uint32_t& numberOfActivities, const uint32_t& maxIter) {
-	maxIterSinceBest = maxIter;
+AdvanceTabuList::AdvanceTabuList(const uint32_t& maxIter) : maxIterSinceBest(maxIter) {
 	baseInit();
 }
 
-bool TabuList::isPossibleMove(const uint32_t& i, const uint32_t& j, const MoveType& type) const {
+bool AdvanceTabuList::isPossibleMove(const uint32_t& i, const uint32_t& j, const MoveType& type) const {
 	struct BaseElement f1 = { i, j, type };
-	struct BaseElement f2 = { j, i, type };
-	if ((tabuHash.find(f1) == tabuHash.end()) && (tabuHash.find(f2) == tabuHash.end()))
+	if (tabuHash.find(f1) == tabuHash.end())
 		return true;
 	else
 		return false;
 }
 
-void TabuList::addTurnToTabuList(const uint32_t& i, const uint32_t& j, const MoveType& type)	{
+void AdvanceTabuList::addTurnToTabuList(const uint32_t& i, const uint32_t& j, const MoveType& type)	{
 	uint32_t liveFactor;
 	switch (type)	{
 		case SWAP:
-			liveFactor = SWAP_ITER;
+			liveFactor = ConfigureRCPSP::ADVANCE_TABU_SWAP_LIVE;
 			break;
 		case SHIFT:
-			liveFactor = SHIFT_ITER;
+			liveFactor = ConfigureRCPSP::ADVANCE_TABU_SHIFT_LIVE;
 			break;
 		default:
 			throw runtime_error("TabuList::addTurnToTabuList: Unsupported move type!");	
@@ -56,7 +54,7 @@ void TabuList::addTurnToTabuList(const uint32_t& i, const uint32_t& j, const Mov
 	tabu.insert(curPos,al);
 }
 
-void TabuList::bestSolutionFound()	{
+void AdvanceTabuList::bestSolutionFound()	{
 	if (!bestTabu.empty())	{
 		secondBestTabu = bestTabu;
 		secondBestTabuHash = bestTabuHash;
@@ -69,7 +67,7 @@ void TabuList::bestSolutionFound()	{
 	return;
 }
 
-size_t TabuList::goToNextIter()	{
+uint32_t AdvanceTabuList::goToNextIter()	{
 
 	if (iterSinceBest > maxIterSinceBest)	{
 		// Current location in space is not suitable for improving current solution.
@@ -77,7 +75,7 @@ size_t TabuList::goToNextIter()	{
 		randomizeTabuList();
 	}
 
-	size_t erasedItems = 0;
+	uint32_t erasedItems = 0;
 	float sizeOfRange = ptl*tabu.size()+ptlRemain;
 	size_t nmbrOfElements = (size_t) sizeOfRange;
 
@@ -105,7 +103,7 @@ size_t TabuList::goToNextIter()	{
 	return erasedItems;
 }
 
-void TabuList::randomizeTabuList()	{
+void AdvanceTabuList::randomizeTabuList()	{
 	if (!secondBestTabu.empty())	{
 		tabu = secondBestTabu;
 		tabuHash = secondBestTabuHash;
@@ -114,7 +112,7 @@ void TabuList::randomizeTabuList()	{
 		tabuHash = bestTabuHash;
 	}
 
-	size_t erasedElements = tabu.size()*RANDOMIZE_ERASE_AMOUNT;
+	size_t erasedElements = tabu.size()*ConfigureRCPSP::ADVANCE_TABU_RANDOMIZE_ERASE_AMOUNT;
 
 	vector<size_t> eraseIdxs;
 	for (size_t i = 0; i < tabu.size(); ++i)	{
@@ -146,14 +144,14 @@ void TabuList::randomizeTabuList()	{
 	return;
 }
 
-void TabuList::baseInit()	{
+void AdvanceTabuList::baseInit()	{
 	curPos = tabu.begin();
 	ptlRemain = 0.0;
 	iterSinceBest = 0;
 	computeNextPtl();
 }
 
-void TabuList::computeNextPtl()	{
+void AdvanceTabuList::computeNextPtl()	{
 	float phase = ((float) iterSinceBest)/((float) maxIterSinceBest);
 	// 1/(e^(-8*x+4)+1)
 	ptl = 1./(exp(-8*phase+4)+1);
