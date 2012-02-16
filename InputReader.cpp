@@ -81,6 +81,8 @@ void InputReader::readFromStream(istream& IN) {
 				for (uint32_t i = 0; i < numberOfSuccessors; ++i)	{
 					if (!(IN>>successor))
 						throw runtime_error("InputReader::readFromStream: Cannot read next ("+numberToStr(i+1)+") successor of activity "+numberToStr(activityId+1)+"!");
+					if (successor > numberOfActivities)
+						throw runtime_error("InputReader::readFromStream: Invalid successor ID of activity "+numberToStr(activityId+1)+"!");
 					activitiesSuccessors[activityId][i] = successor-1;
 				}
 			}
@@ -139,6 +141,8 @@ void InputReader::readFromStream(istream& IN) {
 				for (uint32_t k = 0; k < numberOfSuccessors; ++k)	{
 					if (!(IN>>successor))
 						throw runtime_error("InputReader::readFromStream: Cannot read next ("+numberToStr(k+1)+") successor of activity "+numberToStr(actId)+"!");
+					if (successor >= numberOfActivities)
+						throw runtime_error("InputReader::readFromStream: Invalid successor ID of activity "+numberToStr(actId)+"!");
 					activitiesSuccessors[actId][k] = successor;
 				}
 			}

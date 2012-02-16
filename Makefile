@@ -4,9 +4,9 @@ PROGRAM = RCPSP
 
 INST_PATH = /usr/local/bin/
 
-OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o SourcesLoad.o AdvanceTabuList.o
+OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o SourcesLoad.o AdvanceTabuList.o ConfigureRCPSP.o
 INC = InputReader.h SimpleTabuList.h ScheduleSolver.h SourcesLoad.h DefaultConfigureRCPSP.h ConfigureRCPSP.h AdvanceTabuList.h TabuList.h ConstantsRCPSP.h
-SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoad.cpp AdvanceTabuList.cpp
+SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoad.cpp AdvanceTabuList.cpp ConfigureRCPSP.cpp
 
 # Pokud chcete ladit vykonost, pouzijte volbu -pg (gprof). Linkování knihoven (-static-libstdc++).
 ifdef DEBUG

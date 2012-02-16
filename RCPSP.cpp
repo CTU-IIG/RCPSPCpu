@@ -10,6 +10,12 @@
 
 using namespace std;
 
+int rcpsp(int argc, char* argv[]);
+
+int main(int argc, char* argv[])	{
+	return rcpsp(argc,argv);
+}
+
 template <typename T>
 T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 	if (i+1 < argc)	{
@@ -28,7 +34,7 @@ T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 	}
 }
 
-int main(int argc, char* argv[])	{
+int rcpsp(int argc, char* argv[])	{
 
 	vector<string> inputFiles;
 

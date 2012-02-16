@@ -30,9 +30,9 @@ ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), total
 
 	// Create desired type of tabu list.
 	if (ConfigureRCPSP::TABU_LIST_TYPE == SIMPLE_TABU)
-		tabu = new AdvanceTabuList(ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST);
-	else if (ConfigureRCPSP::TABU_LIST_TYPE == ADVANCE_TABU)
 		tabu = new SimpleTabuList(numberOfActivities, ConfigureRCPSP::SIMPLE_TABU_LIST_SIZE);
+	else if (ConfigureRCPSP::TABU_LIST_TYPE == ADVANCE_TABU)
+		tabu = new AdvanceTabuList(ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST);
 	else
 		throw invalid_argument("ScheduleSolver::ScheduleSolver: Invalid type of tabu list!");
 
@@ -333,7 +333,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 							makeShift(threadOrder, ((int32_t) shift)-((int32_t) i), i);
 
 							uint32_t totalMoveCost = evaluateOrder(threadOrder);
-							bool isPossibleMove = tabu->isPossibleMove(i, shift, SHIFT);
+							bool isPossibleMove = tabu->isPossibleMove(i, i, SHIFT);
 
 							if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
 								threadBestI = threadBestJ = i; threadBestMove = SHIFT;
@@ -372,8 +372,8 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 		if (neighborhoodSize > 0)	{
 			if ((iterBestMove == SWAP) && (tabu->isPossibleMove(iterBestI, iterBestJ, SWAP) == true))
 				tabu->addTurnToTabuList(iterBestI, iterBestJ, SWAP);
-			else if ((iterBestMove == SHIFT) && (tabu->isPossibleMove(iterBestI, iterShiftDiff, SHIFT) == true))
-				tabu->addTurnToTabuList(iterBestI, iterShiftDiff, SHIFT);
+			else if ((iterBestMove == SHIFT) && (tabu->isPossibleMove(iterBestI, iterBestI, SHIFT) == true))
+				tabu->addTurnToTabuList(iterBestI, iterBestI, SHIFT);
 		} else {
 			clog<<"Expanded neighborhood is empty! Prematurely ending..."<<endl;
 			break;
@@ -392,7 +392,6 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 		}
 
 		if (iterBestEval < costOfBestSchedule)	{
-			cerr<<"best cost: "<<iterBestEval<<" ["<<iter<<"]"<<endl;
 			costOfBestSchedule = iterBestEval;
 			numberOfIterSinceBest = 0;
 			tabu->bestSolutionFound();
