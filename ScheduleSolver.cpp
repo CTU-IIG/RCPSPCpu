@@ -14,7 +14,7 @@
 #include "ScheduleSolver.h"
 #include "SourcesLoad.h"
 #include "SimpleTabuList.h"
-#include "AdvanceTabuList.h"
+#include "AdvancedTabuList.h"
 
 using namespace std;
 
@@ -31,8 +31,8 @@ ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), total
 	// Create desired type of tabu list.
 	if (ConfigureRCPSP::TABU_LIST_TYPE == SIMPLE_TABU)
 		tabu = new SimpleTabuList(numberOfActivities, ConfigureRCPSP::SIMPLE_TABU_LIST_SIZE);
-	else if (ConfigureRCPSP::TABU_LIST_TYPE == ADVANCE_TABU)
-		tabu = new AdvanceTabuList(ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST);
+	else if (ConfigureRCPSP::TABU_LIST_TYPE == ADVANCED_TABU)
+		tabu = new AdvancedTabuList(ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST);
 	else
 		throw invalid_argument("ScheduleSolver::ScheduleSolver: Invalid type of tabu list!");
 

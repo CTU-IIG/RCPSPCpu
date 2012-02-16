@@ -23,12 +23,12 @@ void InputReader::readFromStream(istream& IN) {
 	freeInstanceData();
 
 	uint32_t shred;
-	string readedLine;
+	string readLine;
 
-	if (getline(IN, readedLine))	{
+	if (getline(IN, readLine))	{
 		IN.seekg (0, ios::beg);
 		
-		if (!readedLine.empty() && readedLine[0] == '*')	{
+		if (!readLine.empty() && readLine[0] == '*')	{
 			/* PROGEN-SFX FORMAT */
 			string::const_iterator sit;
 			string searchPattern1 = "- renewable";
@@ -36,10 +36,10 @@ void InputReader::readFromStream(istream& IN) {
 			string searchPattern3 = "#successors";
 
 			// Read project basic parameters.
-			while (getline(IN,readedLine))	{
-				if ((sit = search(readedLine.begin(), readedLine.end(), searchPattern1.begin(), searchPattern1.end())) != readedLine.end())	{
+			while (getline(IN,readLine))	{
+				if ((sit = search(readLine.begin(), readLine.end(), searchPattern1.begin(), searchPattern1.end())) != readLine.end())	{
 					string parsedNumber;
-					for (string::const_iterator it = sit; it != readedLine.end(); ++it)	{
+					for (string::const_iterator it = sit; it != readLine.end(); ++it)	{
 						if (isdigit(*it) > 0)
 							parsedNumber.push_back(*it);			
 					}
@@ -48,7 +48,7 @@ void InputReader::readFromStream(istream& IN) {
 						throw runtime_error("InputReader::readFromStream: Cannot read number of resources!");
 				}
 
-				if ((sit = search(readedLine.begin(), readedLine.end(), searchPattern2.begin(), searchPattern2.end())) != readedLine.end())	{
+				if ((sit = search(readLine.begin(), readLine.end(), searchPattern2.begin(), searchPattern2.end())) != readLine.end())	{
 					if (!(IN>>shred>>numberOfActivities))
 						throw runtime_error("InputReader::readFromStream: Cannot read number of activities!");
 					if (numberOfActivities == 0)
@@ -56,7 +56,7 @@ void InputReader::readFromStream(istream& IN) {
 					numberOfActivities += 2;
 				}
 
-				if ((sit = search(readedLine.begin(), readedLine.end(), searchPattern3.begin(), searchPattern3.end())) != readedLine.end())	{
+				if ((sit = search(readLine.begin(), readLine.end(), searchPattern3.begin(), searchPattern3.end())) != readLine.end())	{
 					break;
 				}
 			}
@@ -88,7 +88,7 @@ void InputReader::readFromStream(istream& IN) {
 			}
 
 			for (uint32_t i = 0; i < 5; ++i)
-				getline(IN,readedLine);
+				getline(IN,readLine);
 
 			// Read resource requirements.
 			for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
@@ -109,7 +109,7 @@ void InputReader::readFromStream(istream& IN) {
 			}
 
 			for (uint32_t i = 0; i < 4; ++i)
-				getline(IN,readedLine);
+				getline(IN,readLine);
 
 			// Read capacity of resources.
 			for (uint32_t resourceId = 0; resourceId < totalNumberOfResources; ++resourceId)	{
@@ -118,7 +118,7 @@ void InputReader::readFromStream(istream& IN) {
 					throw runtime_error("InputReader::readFromStream: Invalid read of resource capacity!\nResource ID is "+numberToStr(resourceId+1)+".");
 				capacityOfResources[resourceId] = resourceCapacity;
 			}
-		} else if (!readedLine.empty())	{
+		} else if (!readLine.empty())	{
 			/* PROGEN/MAX 1.0 FORMAT */
 			if (!(IN>>numberOfActivities>>totalNumberOfResources>>shred>>shred))
 				throw runtime_error("InputReader::readFromStream: Cannot read number of activities and number of resource!\nCheck file format.");

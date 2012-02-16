@@ -1,3 +1,9 @@
+/*!
+ * \file RCPSP.cpp
+ * \author Libor Bukata
+ * \brief RCPSP - Resource Constrained Project Scheduling Problem
+ */
+
 #include <iostream>
 #include <typeinfo>
 #include <string>
@@ -10,12 +16,27 @@
 
 using namespace std;
 
+// Forward declaration entry point of the program.
 int rcpsp(int argc, char* argv[]);
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+// Trick how can be entry point of the program ,,renamed'' from main to rcpsp. (for purposes of documentation - Doxygen)
 int main(int argc, char* argv[])	{
 	return rcpsp(argc,argv);
 }
+#endif
 
+/*!
+ * \param option Command line switch.
+ * \param i Current index at argv two-dimensional array. Can be modified.
+ * \param argc Number of arguments (program name + switches + parameters) that were given through command line.
+ * \param argv Command line arguments.
+ * \tparam T Integer or double.
+ * \exception invalid_argument Parameter cannot be read.
+ * \exception range_error Invalid value of read parameter.
+ * \return Parameter of the switch.
+ * \brief Helper function for command line processing.
+ */
 template <typename T>
 T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 	if (i+1 < argc)	{
@@ -23,9 +44,9 @@ T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 		string numStr = argv[++i];
 		istringstream istr(numStr, istringstream::in);
 		if (!(istr>>value))
-			throw invalid_argument("Cannot read argument! (option \""+option+"\")");
+			throw invalid_argument("Cannot read parameter! (option \""+option+"\")");
 		if (value < 0 || (!numStr.empty() && numStr[0] == '-'))
-			throw range_error("Argument value cannot be negative!");
+			throw range_error("Parameter value cannot be negative!");
 		if (typeid(value) == typeid(double) && (value < 0 || value > 1))
 			throw range_error("Invalid range of double! (correct range 0-1)");
 		return value;
@@ -34,6 +55,15 @@ T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 	}
 }
 
+/*!
+ * Entry point for RCPSP solver. Command line arguments are processed, input instances are
+ * read and solved. Results are printed to console (can be easily redirected to file). 
+ * Verbose mode is turned on if and only if one input file is read.
+ * \param argc Number of command line arguments.
+ * \param argv Command line arguments.
+ * \return Zero if success else error code (positive number).
+ * \brief Process arguments, read instances, solve instances and print results.
+ */
 int rcpsp(int argc, char* argv[])	{
 
 	vector<string> inputFiles;
@@ -48,7 +78,7 @@ int rcpsp(int argc, char* argv[])	{
 					inputFiles.push_back(argv[++i]);
 				}
 			} else {
-				cerr<<"Option \"--input-files\" require argument(s)!"<<endl;
+				cerr<<"Option \"--input-files\" require parameter(s)!"<<endl;
 				return 1;
 			}
 		}
@@ -56,8 +86,8 @@ int rcpsp(int argc, char* argv[])	{
 		if (arg == "--simple-tabu-list" || arg == "-stl")
 			ConfigureRCPSP::TABU_LIST_TYPE = SIMPLE_TABU;
 
-		if (arg == "--advance-tabu-list" || arg == "-atl")
-			ConfigureRCPSP::TABU_LIST_TYPE = ADVANCE_TABU;
+		if (arg == "--advanced-tabu-list" || arg == "-atl")
+			ConfigureRCPSP::TABU_LIST_TYPE = ADVANCED_TABU;
 
 		try {
 			if (arg == "--number-of-iterations" || arg == "-noi")
@@ -67,11 +97,11 @@ int rcpsp(int argc, char* argv[])	{
 			if (arg == "--tabu-list-size" || arg == "-tls")
 				ConfigureRCPSP::SIMPLE_TABU_LIST_SIZE = optionHelper<uint32_t>("--tabu-list-size", i, argc, argv);
 			if (arg == "--randomize-erase-amount" || arg == "-rea")
-				ConfigureRCPSP::ADVANCE_TABU_RANDOMIZE_ERASE_AMOUNT = optionHelper<double>("--randomize-erase-amount", i, argc, argv);
-			if (arg == "--swap-live-factor" || arg == "-swlf")
-				ConfigureRCPSP::ADVANCE_TABU_SWAP_LIVE = optionHelper<uint32_t>("--swap-live-factor", i, argc, argv);
-			if (arg == "--shift-live-factor" || arg == "-shlf")
-				ConfigureRCPSP::ADVANCE_TABU_SHIFT_LIVE = optionHelper<uint32_t>("--shift-live-factor", i, argc, argv);
+				ConfigureRCPSP::ADVANCED_TABU_RANDOMIZE_ERASE_AMOUNT = optionHelper<double>("--randomize-erase-amount", i, argc, argv);
+			if (arg == "--swap-life-factor" || arg == "-swlf")
+				ConfigureRCPSP::ADVANCED_TABU_SWAP_LIFE = optionHelper<uint32_t>("--swap-life-factor", i, argc, argv);
+			if (arg == "--shift-life-factor" || arg == "-shlf")
+				ConfigureRCPSP::ADVANCED_TABU_SHIFT_LIFE = optionHelper<uint32_t>("--shift-life-factor", i, argc, argv);
 			if (arg == "--swap-range" || arg == "-swr")
 				ConfigureRCPSP::SWAP_RANGE = optionHelper<uint32_t>("--swap-range", i, argc, argv);
 			if (arg == "--shift-range" || arg == "-shr")
@@ -92,20 +122,20 @@ int rcpsp(int argc, char* argv[])	{
 			cout<<"\t\t"<<"Instances data. Input files are delimited by space."<<endl;
 			cout<<"\t"<<"--simple-tabu-list, -stl"<<endl;
 			cout<<"\t\t"<<"Simple version of tabu list is used."<<endl;
-			cout<<"\t"<<"--advance-tabu-list, -atl"<<endl;
-			cout<<"\t\t"<<"More sophistic version of tabu list is used."<<endl;
+			cout<<"\t"<<"--advanced-tabu-list, -atl"<<endl;
+			cout<<"\t\t"<<"More sophisticated version of tabu list is used."<<endl;
 			cout<<"\t"<<"--number-of-iterations ARG, -noi ARG, ARG=POSITIVE_INTEGER"<<endl;
 			cout<<"\t\t"<<"Number of iterations after which search process will be stopped."<<endl;
 			cout<<"\t"<<"--max-iter-since-best ARG, -misb ARG, ARG=POSITIVE_INTEGER"<<endl;
 			cout<<"\t\t"<<"Maximal number of iterations without improving solution after which diversification will be called."<<endl;
 			cout<<"\t"<<"--tabu-list-size ARG, -tls ARG, ARG=POSITIVE_INTEGER"<<endl;
-			cout<<"\t\t"<<"Size of simple tabu list. Ignored for advance tabu list."<<endl;
+			cout<<"\t\t"<<"Size of simple tabu list. Ignored for advanced tabu list."<<endl;
 			cout<<"\t"<<"--randomize-erase-amount ARG, -rea ARG, ARG=POSITIVE_DOUBLE"<<endl;
-			cout<<"\t\t"<<"Relative amount (0-1) of elements that will be erased from advance tabu list if diversification will be called."<<endl;
-			cout<<"\t"<<"--swap-live-factor ARG, -swlf ARG, ARG=POSITIVE_INTEGER"<<endl;
-			cout<<"\t\t"<<"Set how long will be added swap moves at advance tabu list."<<endl;
-			cout<<"\t"<<"--shift-live-factor ARG, -shlf ARG, ARG=POSITIVE_INTEGER"<<endl;
-			cout<<"\t\t"<<"Set how long will be added shift moves at advance tabu list."<<endl;
+			cout<<"\t\t"<<"Relative amount (0-1) of elements that will be erased from advanced tabu list if diversification will be called."<<endl;
+			cout<<"\t"<<"--swap-life-factor ARG, -swlf ARG, ARG=POSITIVE_INTEGER"<<endl;
+			cout<<"\t\t"<<"Set how long will be added swap moves at advanced tabu list."<<endl;
+			cout<<"\t"<<"--shift-life-factor ARG, -shlf ARG, ARG=POSITIVE_INTEGER"<<endl;
+			cout<<"\t\t"<<"Set how long will be added shift moves at advanced tabu list."<<endl;
 			cout<<"\t"<<"--swap-range ARG, -swr ARG, ARG=POSITIVE_INTEGER"<<endl;
 			cout<<"\t\t"<<"Maximal distance between swapped activities."<<endl;
 			cout<<"\t"<<"--shift-range ARG, -shr ARG, ARG=POSITIVE_INTEGER"<<endl;
@@ -127,7 +157,7 @@ int rcpsp(int argc, char* argv[])	{
 			reader.readFromFile(filename);
 			// Init schedule solver.
 			ScheduleSolver solver(reader);
-			// Solve readed instance.	
+			// Solve read instance.	
 			solver.solveSchedule(ConfigureRCPSP::NUMBER_OF_ITERATIONS);
 			// Print results.
 			if (verbose == true)	{

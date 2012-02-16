@@ -4,11 +4,11 @@ PROGRAM = RCPSP
 
 INST_PATH = /usr/local/bin/
 
-OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o SourcesLoad.o AdvanceTabuList.o ConfigureRCPSP.o
-INC = InputReader.h SimpleTabuList.h ScheduleSolver.h SourcesLoad.h DefaultConfigureRCPSP.h ConfigureRCPSP.h AdvanceTabuList.h TabuList.h ConstantsRCPSP.h
-SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoad.cpp AdvanceTabuList.cpp ConfigureRCPSP.cpp
+OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o SourcesLoad.o AdvancedTabuList.o ConfigureRCPSP.o
+INC = InputReader.h SimpleTabuList.h ScheduleSolver.h SourcesLoad.h DefaultConfigureRCPSP.h ConfigureRCPSP.h AdvancedTabuList.h TabuList.h ConstantsRCPSP.h
+SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoad.cpp AdvancedTabuList.cpp ConfigureRCPSP.cpp
 
-# Pokud chcete ladit vykonost, pouzijte volbu -pg (gprof). Linkování knihoven (-static-libstdc++).
+# If yout want to analyse performance then switch -pg (gprof) should be used. Static linkage of standard C++ library (-static-libstdc++).
 ifdef DEBUG
 OPT = -O0 -g
 LIBS = -std=c++0x
@@ -23,34 +23,40 @@ endif
 .PHONY: clean
 .PHONY: distrib
 
-# Defaultní volba pro příkaz make.
+# Default option for make.
 build: $(PROGRAM)
 
-# Zkompiluje program.
+# Generate documentation.
+doc: 
+	doxygen Documentation/doxyfilelatex; \
+	doxygen Documentation/doxyfilehtml
+
+# Compile program.
 $(PROGRAM): $(OBJ)
 	$(CPP) $(LIBS) $(OPT) -o $(PROGRAM) $(OBJ)
 
-# Vytvoří objekty pro sestavení programů.
+
+# Compile .cpp files to objects.
 %.o: %.cpp
 	$(CPP) $(LIBS) $(OPT) -c -o $@ $<
 
-# Nainstaluje program.
+# Install program.
 install: build
 	cp $(PROGRAM) $(INST_PATH)
 
-# Smaže soubory a program po překladu.
+# Clean temporary files and remove program executable file.
 clean:
 	rm -f *.o $(PROGRAM)
 
-# Odinstaluje program.
+# Uninstall program.
 uninstall:
 	rm -f $(INST_PATH)$(PROGRAM)
 
-# Vytvoří zabalený balíček se zdrojovými kódy.
+# Create tarball from the project files.
 distrib:
 	tar -c $(SRC) $(INC) Makefile > $(PROGRAM).tar; \
     bzip2 $(PROGRAM).tar
 
-# Závislost všech objektových souborů na hlavičkách.
+# Dependencies among header files and object files.
 ${OBJ}: ${INC}
 

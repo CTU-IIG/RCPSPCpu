@@ -1,32 +1,77 @@
 #ifndef HLIDAC_PES_SIMPLE_TABU_LIST_H
 #define HLIDAC_PES_SIMPLE_TABU_LIST_H
 
+/*!
+ * \file SimpleTabuList.h
+ * \author Libor Bukata
+ * \brief Simple tabu list class definition.
+ */
+
 #include <stdint.h>
 #include "TabuList.h"
 
+/*!
+ * \struct ListRecord
+ * \brief Simple tabu list item.
+ */
 struct ListRecord {
+	//! Index, activity identification or something else. Maximal value is total number of activities-1.
 	int32_t i;
+	//! Index, activity identification or something else. Maximal value is total number of activities-1.
 	int32_t j;
 };
 
+/*!
+ * Implementation of simple version of tabu list. Implement only required methods.
+ * Effectiveness of items search is achieved by tabu hash.
+ * Tabu list is implemented as a circular buffer with fixed size.
+ * \class SimpleTabuList
+ * \brief Simple tabu list implementation. Tabu hash and circular buffer are used.
+ */
 class SimpleTabuList : public TabuList {
 	public:
+		/*!
+		 * \param numberOfActivities Total number of activities (or jobs).
+		 * \param length Tabu list size. (circular buffer size)
+		 * \brief Initialize tabu hash and tabu list elements.
+		 */
 		SimpleTabuList(const uint32_t& numberOfActivities, const uint32_t& length);
 
+		/*!
+		 * \param i Index, activity identification or something else.
+		 * \param j Index, activity identification or something else.
+		 * \return False if move is at the tabu hash else true.
+		 * \brief Check if move is possible or not.
+		 * \note Third parameter is ignored.
+		 */
 		virtual bool isPossibleMove(const uint32_t& i, const uint32_t& j, const MoveType&) const;
+		/*!
+		 * \param i Index, activity identification or something else.
+		 * \param j Index, activity identification or something else.
+		 * \brief Add move to simple tabu list. Update tabu list and tabu hash.
+		 * \note Third parameter is ignored.
+		 */
 		virtual void addTurnToTabuList(const uint32_t& i, const uint32_t& j, const MoveType&);
 
+		//! Free all allocated resources. (i.e. tabu list and tabu hash)
 		virtual ~SimpleTabuList();
 
 	private:
 
+		//! Copy constructor is forbidden.
 		SimpleTabuList(const SimpleTabuList&);
+		//! Assignment operator is forbidden.
 		SimpleTabuList& operator=(const SimpleTabuList&);
 
+		//! Current index at tabu list. (circular buffer)
 		uint32_t curIdx;
-		ListRecord * tabu;	
+		//! Array of tabu list items. It is tabu list.
+		ListRecord *tabu;	
+		//! Tabu hash structure. It's two-dimensional array of boolean (size totalNumberOfActivities x totalNumberOfActivities).
 		bool **tabuSearch;
+		//! Fixed tabu list size.
 		const uint32_t tabuLength;
+		//! Number of activities read from instance file. Required for tabuSearch allocation.
 		const uint32_t totalNumberOfActivities;
 };
 
