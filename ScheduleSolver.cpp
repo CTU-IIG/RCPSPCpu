@@ -117,28 +117,78 @@ void ScheduleSolver::createInitialSolution()	{
 		}
 	}
 
-	uint32_t *outBestSchedule = bestScheduleOrder;
-	copy(activitiesOrder, activitiesOrder+numberOfActivities, outBestSchedule);
-	costOfBestSchedule = evaluateOrder(activitiesOrder);
+	delete[] levels;
+	delete[] currentLevel;
+	delete[] newCurrentLevel;
 
 
-	/* PRECOMPUTE MATRIX OF SUCCESSORS */
+
+	/* PRECOMPUTE MATRIX OF SUCCESSORS AND CRITICAL PATH MAKESPAN */
 
 	relationMatrix = new int8_t*[numberOfActivities];
-	for (int8_t** ptr = relationMatrix; ptr < relationMatrix+numberOfActivities; ++ptr)	{
-		*ptr = new int8_t[numberOfActivities];
-		memset(*ptr, 0, sizeof(int8_t)*numberOfActivities);
+	int32_t **distanceMatrix = new int32_t*[numberOfActivities];
+	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+		relationMatrix[i] = new int8_t[numberOfActivities];
+		memset(relationMatrix[i], 0, sizeof(int8_t)*numberOfActivities);
+		distanceMatrix[i] = new int32_t[numberOfActivities];
+		memset(distanceMatrix[i], -1, sizeof(int32_t)*numberOfActivities);
 	}
 
 	for (uint32_t activityId = 0; activityId < numberOfActivities; ++activityId)	{
 		for (uint32_t j = 0; j < numberOfSuccessors[activityId]; ++j)	{
 			relationMatrix[activityId][activitiesSuccessors[activityId][j]] = 1;
+			distanceMatrix[activityId][activitiesSuccessors[activityId][j]] = activitiesDuration[activityId];
 		}
 	}
 
-	delete[] levels;
-	delete[] currentLevel;
-	delete[] newCurrentLevel;
+	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+		for (uint32_t j = 0; j < numberOfActivities; ++j)	{
+			for (uint32_t k = 0; k < numberOfActivities; ++k)	{
+				if (distanceMatrix[i][k] != -1 && distanceMatrix[k][j] != -1)	{
+					if (distanceMatrix[i][j] != -1)	{
+						if (distanceMatrix[i][j] < distanceMatrix[i][k]+distanceMatrix[k][j])
+							distanceMatrix[i][j] = distanceMatrix[i][k]+distanceMatrix[k][j];
+					} else {
+						distanceMatrix[i][j] = distanceMatrix[i][k]+distanceMatrix[k][j];
+					}
+				}
+			}
+		}
+	}
+
+	if (numberOfActivities > 1)
+		criticalPathMakespan = distanceMatrix[0][numberOfActivities-1];
+	else
+		criticalPathMakespan = -1;
+
+	for (uint32_t i = 0; i < numberOfActivities; ++i)
+		delete[] distanceMatrix[i];
+	delete[] distanceMatrix;
+
+
+	/* IMPROVE COST OF INIT SOLUTION */
+
+	for (uint32_t i = 1; i < numberOfActivities-2; ++i)	{
+		uint32_t bestI = i, bestJ = i;
+		uint32_t bestCost = evaluateOrder(activitiesOrder);
+		for (uint32_t j = i+1; j < numberOfActivities-1; ++j)	{
+			if (checkSwapPrecedencePenalty(i,j))	{
+				swap(activitiesOrder[i], activitiesOrder[j]);
+				uint32_t cost = evaluateOrder(activitiesOrder);
+				if (cost < bestCost)	{
+					bestI = i; bestJ = j;
+					bestCost = cost;
+				}
+				swap(activitiesOrder[i], activitiesOrder[j]);
+			}
+		}
+		if (bestI != bestJ)
+			swap(activitiesOrder[bestI], activitiesOrder[bestJ]);
+	}
+
+	uint32_t *outBestSchedule = bestScheduleOrder;
+	copy(activitiesOrder, activitiesOrder+numberOfActivities, outBestSchedule);
+	costOfBestSchedule = evaluateOrder(activitiesOrder);
 }
 
 uint32_t ScheduleSolver::evaluateOrder(const uint32_t * const& order, uint32_t *startTimesWriter, uint32_t *startTimesWriterById)	const	{
@@ -208,9 +258,10 @@ void ScheduleSolver::printSchedule(const uint32_t * const& scheduleOrder, bool v
 		OUT<<endl;
 		OUT<<"Schedule length: "<<scheduleLength<<endl;
 		OUT<<"Precedence penalty: "<<precedencePenalty<<endl;
+		OUT<<"Critical path makespan: "<<criticalPathMakespan<<endl;
 		OUT<<"Schedule solve time: "<<totalRunTime<<" s"<<endl;
 	}	else	{
-		OUT<<scheduleLength<<"+"<<precedencePenalty<<"\t["<<totalRunTime<<" s]"<<endl;
+		OUT<<scheduleLength<<"+"<<precedencePenalty<<" "<<criticalPathMakespan<<"\t["<<totalRunTime<<" s]"<<endl;
 	}
 
 	delete[] startTimesById;

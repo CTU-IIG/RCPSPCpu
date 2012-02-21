@@ -115,6 +115,8 @@ class ScheduleSolver {
 		uint32_t **activitiesResources;
 		//! Matrix of successors. (if matrix(i,j) == 1 then "Exist precedence edge between activities i and j")
 		int8_t **relationMatrix;
+		//! Critical Path Makespan. (Critical Path Method)
+		int32_t criticalPathMakespan;
 
 		/* MUTABLE DATA */	
 
