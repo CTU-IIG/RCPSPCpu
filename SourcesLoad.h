@@ -76,8 +76,6 @@ class SourcesLoad {
 		uint32_t **resourcesLoad;
 		//! Helper array that is used at addActivity method.
 		uint32_t *startValues;
-		//! Helper array that is used at addActivity method.
-		uint32_t *reqItems;
 
 		#if DEBUG_SOURCES == 1
 		//! Save current state of the resources as a peaks. Only in debug mode.
