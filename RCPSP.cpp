@@ -141,7 +141,7 @@ int rcpsp(int argc, char* argv[])	{
 			cout<<"\t"<<"--shift-range ARG, -shr ARG, ARG=POSITIVE_INTEGER"<<endl;
 			cout<<"\t\t"<<"Maximal number of activities which can moved activity go through."<<endl;
 			cout<<"\t"<<"--diversification-swaps ARG, -ds ARG, ARG=POSITIVE_INTEGER"<<endl;
-			cout<<"\t\t"<<"How many swaps should be performed when diversification is callled."<<endl<<endl;
+			cout<<"\t\t"<<"How many swaps should be performed than diversification is callled."<<endl<<endl;
 			cout<<"Default values can be modified at \"DefaultConfigureRCPSP.h\" file."<<endl;
 			return 0;
 		}
