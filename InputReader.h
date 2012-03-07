@@ -60,7 +60,7 @@ class InputReader {
 
 	private:
 
-		//! Helper function which allocate some arrays.
+		//! Helper function which allocates some arrays.
 		void allocateBaseArrays();
 		/*!
 		 * \param number String number.
