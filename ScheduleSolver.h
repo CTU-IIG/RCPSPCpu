@@ -28,10 +28,11 @@ class ScheduleSolver {
 
 		/*!
 		 * \param maxIter Number of iterations that should be performed.
+		 * \param graphFilename Filename of generated graph (csv file).
 		 * \exception runtime_error Unsupported type of move.
 		 * \brief Use tabu search to find good quality solution.
 		 */
-		void solveSchedule(const uint32_t& maxIter = ConfigureRCPSP::NUMBER_OF_ITERATIONS);
+		void solveSchedule(const uint32_t& maxIter = ConfigureRCPSP::NUMBER_OF_ITERATIONS, const std::string& graphFilename = "");
 		/*!
 		 * \param verbose If true then verbose mode is turn on.
 		 * \param OUT Output stream.

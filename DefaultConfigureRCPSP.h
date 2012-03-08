@@ -36,6 +36,8 @@
 #define DEFAULT_SHIFT_RANGE 0
 //! Number of diversification swaps.
 #define DEFAULT_DIVERSIFICATION_SWAPS 10
+//! Do you want to write makespan criterion graph (independent variable is iteration number). As a result you obtain csv file. (1 == true, 0 == false)
+#define DEFAULT_WRITE_GRAPH 0
 
 #endif
 

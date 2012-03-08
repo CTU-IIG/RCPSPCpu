@@ -290,7 +290,7 @@ ScheduleSolver::~ScheduleSolver()	{
 }
 
 
-void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
+void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphFilename)	{
 	#ifdef __GNUC__
 	timeval startTime, endTime, diffTime;
 	gettimeofday(&startTime, NULL);
@@ -303,12 +303,22 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 
 	srand(time(NULL));
 	uint32_t numberOfIterSinceBest = 0;
+	FILE *graphFile = NULL;
+	if (ConfigureRCPSP::WRITE_GRAPH == true && !graphFilename.empty())	{
+		graphFile = fopen(graphFilename.c_str(), "w");
+		if (graphFile == NULL)	{
+			cerr<<"ScheduleSolver::solveSchedule: Cannot write csv file! Check permissions."<<endl;
+		}	else	{
+			fprintf(graphFile, "Iteration number; Current criterion; Current best known makespan;\n");
+			fprintf(graphFile, "0; %u; %u;\n", costOfBestSchedule, costOfBestSchedule);
+		}
+	}
 
 	for (uint32_t iter = 0; iter < maxIter; ++iter)	{
 		size_t neighborhoodSize = 0;
 		MoveType iterBestMove = NONE;
 		uint32_t iterBestI = 0, iterBestJ = 0, iterShiftDiff = 0;
-		size_t iterBestEval = UINT32_MAX;
+		uint32_t iterBestEval = UINT32_MAX;
 
 		uint32_t *currentScheduleStartTimes = new uint32_t[numberOfActivities];
 		evaluateOrder(activitiesOrder, currentScheduleStartTimes);
@@ -452,12 +462,20 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter)	{
 			++numberOfIterSinceBest;
 		}
 
+		if (graphFile != NULL)	{
+			fprintf(graphFile, "%u; %u; %u;\n", iter+1u, iterBestEval, costOfBestSchedule);
+		}
+
 		if (numberOfIterSinceBest > ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST)	{
 			makeDiversification();
 			numberOfIterSinceBest = 0;
 		}
 
 		tabu->goToNextIter();
+	}
+
+	if (graphFile != NULL)	{
+		fclose(graphFile);
 	}
 
 	#ifdef __GNUC__

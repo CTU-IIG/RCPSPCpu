@@ -89,6 +89,9 @@ int rcpsp(int argc, char* argv[])	{
 		if (arg == "--advanced-tabu-list" || arg == "-atl")
 			ConfigureRCPSP::TABU_LIST_TYPE = ADVANCED_TABU;
 
+		if (arg == "--write-makespan-graph" || arg == "-wmg")
+			ConfigureRCPSP::WRITE_GRAPH = true;
+
 		try {
 			if (arg == "--number-of-iterations" || arg == "-noi")
 				ConfigureRCPSP::NUMBER_OF_ITERATIONS = optionHelper<uint32_t>("--number-of-iterations", i, argc, argv);
@@ -141,7 +144,10 @@ int rcpsp(int argc, char* argv[])	{
 			cout<<"\t"<<"--shift-range ARG, -shr ARG, ARG=POSITIVE_INTEGER"<<endl;
 			cout<<"\t\t"<<"Maximal number of activities which can moved activity go through."<<endl;
 			cout<<"\t"<<"--diversification-swaps ARG, -ds ARG, ARG=POSITIVE_INTEGER"<<endl;
-			cout<<"\t\t"<<"How many swaps should be performed than diversification is callled."<<endl<<endl;
+			cout<<"\t\t"<<"How many swaps should be performed than diversification is callled."<<endl;
+			cout<<"\t"<<"--write-makespan-graph, -wmg"<<endl;
+			cout<<"\t\t"<<"If you want to write makespan criterion graph (independent variable is number of iterations)"<<endl;
+			cout<<"\t\t"<<"then use this switch to enable csv file generation."<<endl<<endl;
 			cout<<"Default values can be modified at \"DefaultConfigureRCPSP.h\" file."<<endl;
 			return 0;
 		}
@@ -158,7 +164,17 @@ int rcpsp(int argc, char* argv[])	{
 			// Init schedule solver.
 			ScheduleSolver solver(reader);
 			// Solve read instance.	
-			solver.solveSchedule(ConfigureRCPSP::NUMBER_OF_ITERATIONS);
+			string graphFilename = "";
+			if (ConfigureRCPSP::WRITE_GRAPH == true)	{
+				int32_t i;
+				for (i = filename.size()-1; i >= 0; --i)	{
+					if (filename[i] == '.')
+						break;
+				}
+				if (i > 0)
+					graphFilename = string(filename, 0, i) + ".csv";
+			}
+			solver.solveSchedule(ConfigureRCPSP::NUMBER_OF_ITERATIONS, graphFilename);
 			// Print results.
 			if (verbose == true)	{
 				solver.printBestSchedule();

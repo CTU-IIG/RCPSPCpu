@@ -42,6 +42,8 @@ namespace ConfigureRCPSP {
 	extern uint32_t SHIFT_RANGE;
 	//! Number of diversification swaps.
 	extern uint32_t DIVERSIFICATION_SWAPS;
+	//! Do you want a write csv file? Makespan criterion dependent on number of iterations.
+	extern bool WRITE_GRAPH;
 }
 
 #endif
