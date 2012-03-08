@@ -107,9 +107,9 @@ class ScheduleSolver {
 		uint32_t **activitiesSuccessors;
 		//! Number of successors that activities.
 		uint32_t *numberOfSuccessors;
-		//! Precomputed predecessors;
+		//! Precomputed predecessors.
 		uint32_t **activitiesPredecessors;
-		//! Number of predecessors;
+		//! Number of predecessors.
 		uint32_t *numberOfPredecessors;
 		//! Sources that are required by activities.
 		uint32_t **activitiesResources;
