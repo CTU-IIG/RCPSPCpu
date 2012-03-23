@@ -61,21 +61,12 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 	#endif
 
 	int32_t requiredSquares, timeDiff;
-	uint32_t k, c, capacityOfResource, resourceRequirement, baseResourceIdx, startTimePreviousUnit, newStartTime;
+	uint32_t k, c, capacityOfResource, resourceRequirement, newStartTime;
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
 		capacityOfResource = capacityOfResources[resourceId];
 		resourceRequirement = activityRequirement[resourceId];
 		requiredSquares = resourceRequirement*(activityStop-activityStart);
 		if (requiredSquares > 0)	{
-			baseResourceIdx = capacityOfResource-resourceRequirement;
-			startTimePreviousUnit = ((resourceRequirement < capacityOfResource) ? resourcesLoad[resourceId][baseResourceIdx-1] : activityStop);
-			newStartTime = min(activityStop, startTimePreviousUnit);
-			if (activityStart < startTimePreviousUnit)	{
-				for (k = baseResourceIdx; k < capacityOfResource; ++k)	{
-					resourcesLoad[resourceId][k] = newStartTime; 
-				}
-				requiredSquares -= resourceRequirement*(newStartTime-activityStart); 
-			}
 			c = 0; k = 0;
 			newStartTime = activityStop;
 			while (requiredSquares > 0 && k < capacityOfResource)	{
