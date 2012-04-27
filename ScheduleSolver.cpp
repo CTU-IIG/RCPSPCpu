@@ -11,6 +11,10 @@
 #include <Windows.h>
 #endif
 
+#ifndef UINT32_MAX
+#define UINT32_MAX 0xffffffff
+#endif
+
 #include "ScheduleSolver.h"
 #include "SourcesLoad.h"
 #include "SimpleTabuList.h"
