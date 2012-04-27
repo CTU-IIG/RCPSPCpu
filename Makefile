@@ -10,11 +10,11 @@ SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoa
 
 # If yout want to analyse performance then switch -pg (gprof) should be used. Static linkage of standard C++ library (-static-libstdc++).
 ifdef DEBUG
-OPT = -O0 -g
+GCC_OPTIONS = -O0 -g
 LIBS = -std=c++0x
 else
-OPT = -pedantic -Wall -march=native -O3 -pipe -funsafe-math-optimizations
-LIBS = -fopenmp -std=c++0x
+GCC_OPTIONS = -pedantic -Wall -march=native -O3 -pipe -funsafe-math-optimizations -fopenmp
+LIBS = -std=c++0x
 endif
 
 .PHONY: build
@@ -33,12 +33,12 @@ doc:
 
 # Compile program.
 $(PROGRAM): $(OBJ)
-	$(CPP) $(LIBS) $(OPT) -o $(PROGRAM) $(OBJ)
+	$(CPP) $(LIBS) $(GCC_OPTIONS) -o $(PROGRAM) $(OBJ)
 
 
 # Compile .cpp files to objects.
 %.o: %.cpp
-	$(CPP) $(LIBS) $(OPT) -c -o $@ $<
+	$(CPP) $(LIBS) $(GCC_OPTIONS) -c -o $@ $<
 
 # Install program.
 install: build
