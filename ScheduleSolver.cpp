@@ -145,9 +145,9 @@ void ScheduleSolver::createInitialSolution()	{
 		}
 	}
 
-	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		for (uint32_t j = 0; j < numberOfActivities; ++j)	{
-			for (uint32_t k = 0; k < numberOfActivities; ++k)	{
+	for (uint32_t k = 0; k < numberOfActivities; ++k)	{
+		for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+			for (uint32_t j = 0; j < numberOfActivities; ++j)	{
 				if (distanceMatrix[i][k] != -1 && distanceMatrix[k][j] != -1)	{
 					if (distanceMatrix[i][j] != -1)	{
 						if (distanceMatrix[i][j] < distanceMatrix[i][k]+distanceMatrix[k][j])
