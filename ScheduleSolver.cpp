@@ -252,13 +252,13 @@ void ScheduleSolver::printSchedule(const uint32_t * const& scheduleOrder, bool v
 		OUT<<"start\tactivities"<<endl;
 		for (uint32_t c = 0; c <= scheduleLength; ++c)	{
 			bool first = true;
-			for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-				if (startTimesById[i] == c)	{
+			for (uint32_t id = 0; id < numberOfActivities; ++id)	{
+				if (startTimesById[id] == c)	{
 					if (first == true)	{
-						OUT<<c<<":\t"<<(scheduleOrder[i]+1);
+						OUT<<c<<":\t"<<id+1;
 						first = false;
 					} else {
-						OUT<<" "<<(scheduleOrder[i]+1);
+						OUT<<" "<<id+1;
 					}
 				}
 			}
