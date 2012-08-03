@@ -197,7 +197,7 @@ void ScheduleSolver::createInitialSolution()	{
 
 uint32_t ScheduleSolver::evaluateOrder(const uint32_t * const& order, uint32_t *startTimesWriter, uint32_t *startTimesWriterById)	const	{
 	bool freeMem = false;
-	uint32_t start = 0, scheduleLength = 0;
+	uint32_t scheduleLength = 0;
 	SourcesLoad load(numberOfResources,capacityOfResources);
 	if (startTimesWriterById == NULL)	{
 		startTimesWriterById = new uint32_t[numberOfActivities];
@@ -206,6 +206,7 @@ uint32_t ScheduleSolver::evaluateOrder(const uint32_t * const& order, uint32_t *
 	memset(startTimesWriterById, 0, sizeof(uint32_t)*numberOfActivities);
 
 	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+		uint32_t start = 0;
 		uint32_t activityId = order[i];
 		for (uint32_t j = 0; j < numberOfPredecessors[activityId]; ++j)	{
 			uint32_t predecessorId = activitiesPredecessors[activityId][j];
@@ -248,18 +249,21 @@ void ScheduleSolver::printSchedule(const uint32_t * const& scheduleOrder, bool v
 	size_t precedencePenalty = computePrecedencePenalty(startTimesById);
 	
 	if (verbose == true)	{
-		int32_t startTime = -1;
 		OUT<<"start\tactivities"<<endl;
-		for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-			if (startTime != ((int32_t) startTimes[i]))	{
-				if (i != 0) OUT<<endl;
-				OUT<<startTimes[i]<<":\t"<<(scheduleOrder[i]+1);
-				startTime = startTimes[i];
-			} else {
-				OUT<<" "<<(scheduleOrder[i]+1);
+		for (uint32_t c = 0; c <= scheduleLength; ++c)	{
+			bool first = true;
+			for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+				if (startTimesById[i] == c)	{
+					if (first == true)	{
+						OUT<<c<<":\t"<<(scheduleOrder[i]+1);
+						first = false;
+					} else {
+						OUT<<" "<<(scheduleOrder[i]+1);
+					}
+				}
 			}
+			if (!first)	OUT<<endl;
 		}
-		OUT<<endl;
 		OUT<<"Schedule length: "<<scheduleLength<<endl;
 		OUT<<"Precedence penalty: "<<precedencePenalty<<endl;
 		OUT<<"Critical path makespan: "<<criticalPathMakespan<<endl;
@@ -325,14 +329,17 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 		uint32_t iterBestEval = UINT32_MAX;
 
 		uint32_t *currentScheduleStartTimes = new uint32_t[numberOfActivities];
-		evaluateOrder(activitiesOrder, currentScheduleStartTimes);
+		uint32_t upperBound = evaluateOrder(activitiesOrder, currentScheduleStartTimes);
+
+		uint8_t *extraCost = new uint8_t[numberOfActivities/4+1];
+		memset(extraCost, 0xff, sizeof(uint8_t)*(numberOfActivities/4+1));
 
 		#pragma omp parallel reduction(+:neighborhoodSize)
 		{
 			/* PRIVATE DATA FOR EVERY THREAD */
 			MoveType threadBestMove = NONE;
 			uint32_t threadBestI = 0, threadBestJ = 0, threadShiftDiff = 0;
-			size_t threadBestEval = UINT32_MAX;
+			uint32_t threadBestEval = UINT32_MAX;;
 			size_t threadNeighborhoodCounter = 0;
 
 			// Each thread own copy of current order.
@@ -353,10 +360,12 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 					if (((currentScheduleStartTimes[i] != currentScheduleStartTimes[j]) || (currentScheduleStartTimes[i-1] != currentScheduleStartTimes[i])) && (precedenceFree == true))	{
 						swap(threadOrder[i], threadOrder[j]);
 
-						uint32_t totalMoveCost = evaluateOrder(threadOrder);
+						uint32_t totalMoveCost = (evaluateOrder(threadOrder)<<2);
+						totalMoveCost |= ((extraCost[j/4] & (0x03<<(2*(j%4))))>>(2*(j%4)));
+
 						bool isPossibleMove = tabu->isPossibleMove(i, j, SWAP);
 
-						if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
+						if ((isPossibleMove == true && threadBestEval > totalMoveCost) || (totalMoveCost>>2) < costOfBestSchedule)	{
 							threadBestI = i; threadBestJ = j; threadBestMove = SWAP;
 							threadBestEval = totalMoveCost;
 							++threadNeighborhoodCounter;
@@ -397,10 +406,10 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 						if (penaltyFree == true)	{
 							makeShift(threadOrder, ((int32_t) shift)-((int32_t) i), i);
 
-							uint32_t totalMoveCost = evaluateOrder(threadOrder);
+							uint32_t totalMoveCost = ((evaluateOrder(threadOrder)<<2) | 0x03);
 							bool isPossibleMove = tabu->isPossibleMove(i, i, SHIFT);
 
-							if ((isPossibleMove == true && threadBestEval > totalMoveCost) || totalMoveCost < costOfBestSchedule)	{
+							if ((isPossibleMove == true && threadBestEval > totalMoveCost) || (totalMoveCost>>2) < costOfBestSchedule)	{
 								threadBestI = threadBestJ = i; threadBestMove = SHIFT;
 								threadBestEval = totalMoveCost; threadShiftDiff = shift;
 								++threadNeighborhoodCounter;
@@ -430,6 +439,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 			delete[] threadOrder;
 		}
 
+		delete[] extraCost;
 		delete[] currentScheduleStartTimes;
 
 		/* CHECK BEST SOLUTION AND UPDATE TABU LIST */
@@ -456,8 +466,8 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 				throw runtime_error("ScheduleSolver::solveSchedule: Unsupported type of move!");
 		}
 
-		if (iterBestEval < costOfBestSchedule)	{
-			costOfBestSchedule = iterBestEval;
+		if ((iterBestEval>>2) < costOfBestSchedule)	{
+			costOfBestSchedule = (iterBestEval>>2);
 			numberOfIterSinceBest = 0;
 			tabu->bestSolutionFound();
 			uint32_t *outBestSchedule = bestScheduleOrder;
@@ -467,7 +477,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 		}
 
 		if (graphFile != NULL)	{
-			fprintf(graphFile, "%u; %u; %u;\n", iter+1u, iterBestEval, costOfBestSchedule);
+			fprintf(graphFile, "%u; %u; %u;\n", iter+1u, iterBestEval>>2, costOfBestSchedule);
 		}
 
 		if (numberOfIterSinceBest > ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST)	{

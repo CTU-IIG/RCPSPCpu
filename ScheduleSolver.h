@@ -53,6 +53,7 @@ class ScheduleSolver {
 		 * \param startTimesWriterById Start times of the activities can be written to this array. Order is defined by activities ID's.
 		 * \return Length of the schedule.
 		 * \brief Input order is evaluated and start times are determined. Total schedule length is returned.
+		 * \warning Order of activities is sequence of putting to the schedule, start time values don't have to be ordered ascendly.
 		 */
 		uint32_t evaluateOrder(const uint32_t * const& order, uint32_t *startTimesWriter = NULL, uint32_t *startTimesWriterById = NULL) const;
 		/*!

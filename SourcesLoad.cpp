@@ -39,19 +39,45 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 	} else {
 		int32_t *peak = mit->second;
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] -= activityRequirement[idx];
+			peak[idx] -= (int32_t) activityRequirement[idx];
 	}
 
 	if ((mit = peaks.find(activityStop)) == peaks.end())	{
 		int32_t *peak = new int32_t[numberOfResources];
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] = ((int32_t) activityRequirement[idx]);
+			peak[idx] = (int32_t) activityRequirement[idx];
 		peaks[activityStop] = peak;
 	} else {
 		int32_t *peak = mit->second;
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] += activityRequirement[idx];
+			peak[idx] += (int32_t) activityRequirement[idx];
 	}
+
+	int32_t lastLevel, cumulativeValue;
+	for (uint32_t r = 0; r < numberOfResources; ++r)	{
+		cumulativeValue = 0;
+		bool eraseHoles = false;
+		lastLevel = capacityOfResources[r];
+		for (map<uint32_t,int32_t*>::reverse_iterator rit = peaks.rbegin(); rit != peaks.rend(); ++rit)	{
+			int32_t peak = rit->second[r];
+			if (peak < 0)	{
+				eraseHoles = true;
+				lastLevel = cumulativeValue;	
+			}
+
+			cumulativeValue += peak;
+
+			if (eraseHoles == true)	{
+				if (lastLevel > cumulativeValue)	{
+					rit->second[r] = 0;
+				} else {
+					eraseHoles = false;
+					rit->second[r] = cumulativeValue-lastLevel;
+				}
+			}
+		}
+	}
+
 	uint32_t **resourcesLoadCopy = new uint32_t*[numberOfResources];
 	for (uint32_t i = 0; i < numberOfResources; ++i)	{
 		resourcesLoadCopy[i] = new uint32_t[capacityOfResources[i]];
@@ -107,7 +133,6 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 	}
 
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
-		uint32_t pos = 0;
 		uint32_t capacityOfResource = capacityOfResources[resourceId];
 		uint32_t *startTimes = new uint32_t[capacityOfResource];
 		memset(startTimes, 0, sizeof(uint32_t)*capacityOfResource);
@@ -120,8 +145,10 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 			int32_t curVal = (*it2)[resourceId];
 			if (curVal > ((int32_t) capacityOfResource))
 				cerr<<"Overload resource "<<resourceId+1<<endl;
-			while (curVal > ((int32_t) pos) && ((int32_t) pos) < capacityOfResource)	{
-				startTimes[pos++] = curTime;
+
+			for (uint32_t i = 0; i < (uint32_t) curVal && i < capacityOfResource; ++i)	{
+				if (startTimes[i] < curTime)
+					startTimes[i] = curTime;
 			}
 
 			++it1; ++it2;
@@ -152,6 +179,11 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 			cerr<<"Probably incorrect result: "<<endl;
 			for (uint32_t i = 0; i < capacityOfResource; ++i)	{
 				cerr<<" "<<resourcesLoad[resourceId][i];
+			}
+			cerr<<endl;
+			cerr<<"Time of peaks and values:"<<endl;
+			for (map<uint32_t,int32_t*>::const_iterator mit = peaks.begin(); mit != peaks.end(); ++mit)	{
+				cerr<<mit->first<<" -> "<<mit->second[resourceId]<<"; ";
 			}
 			cerr<<endl;
 		}
