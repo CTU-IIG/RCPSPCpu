@@ -22,7 +22,7 @@
 
 using namespace std;
 
-ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), totalRunTime(0) 	{
+ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), totalRunTime(0), numberOfEvaluatedSchedules(0) 	{
 	// Copy pointers to data of instance.
 	numberOfResources = rcpspData.getNumberOfResources();
 	capacityOfResources = rcpspData.getCapacityOfResources();
@@ -268,8 +268,9 @@ void ScheduleSolver::printSchedule(const uint32_t * const& scheduleOrder, bool v
 		OUT<<"Precedence penalty: "<<precedencePenalty<<endl;
 		OUT<<"Critical path makespan: "<<criticalPathMakespan<<endl;
 		OUT<<"Schedule solve time: "<<totalRunTime<<" s"<<endl;
+		OUT<<"Total number of evaluated schedules: "<<numberOfEvaluatedSchedules<<endl;
 	}	else	{
-		OUT<<scheduleLength<<"+"<<precedencePenalty<<" "<<criticalPathMakespan<<"\t["<<totalRunTime<<" s]"<<endl;
+		OUT<<scheduleLength<<"+"<<precedencePenalty<<" "<<criticalPathMakespan<<"\t["<<totalRunTime<<" s]\t"<<numberOfEvaluatedSchedules<<endl;
 	}
 
 	delete[] startTimesById;
@@ -310,6 +311,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 	#endif
 
 	srand(time(NULL));
+	numberOfEvaluatedSchedules = 0;
 	uint32_t numberOfIterSinceBest = 0;
 	FILE *graphFile = NULL;
 	if (ConfigureRCPSP::WRITE_GRAPH == true && !graphFilename.empty())	{
@@ -334,7 +336,8 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 		uint8_t *extraCost = new uint8_t[numberOfActivities/4+1];
 		memset(extraCost, 0xff, sizeof(uint8_t)*(numberOfActivities/4+1));
 
-		#pragma omp parallel reduction(+:neighborhoodSize)
+		uint64_t evaluatedSchedulesInIteration = 0;
+		#pragma omp parallel reduction(+:neighborhoodSize,evaluatedSchedulesInIteration)
 		{
 			/* PRIVATE DATA FOR EVERY THREAD */
 			MoveType threadBestMove = NONE;
@@ -370,6 +373,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 							threadBestEval = totalMoveCost;
 							++threadNeighborhoodCounter;
 						}
+						++evaluatedSchedulesInIteration;
 
 						swap(threadOrder[i], threadOrder[j]);
 					} else if (relationMatrix[activitiesOrder[i]][activitiesOrder[j]] == 1)	{
@@ -414,6 +418,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 								threadBestEval = totalMoveCost; threadShiftDiff = shift;
 								++threadNeighborhoodCounter;
 							}
+							++evaluatedSchedulesInIteration;
 
 							makeShift(threadOrder, ((int32_t) i)-((int32_t) shift), shift);
 						}
@@ -486,6 +491,7 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 		}
 
 		tabu->goToNextIter();
+		numberOfEvaluatedSchedules += evaluatedSchedulesInIteration;
 	}
 
 	if (graphFile != NULL)	{

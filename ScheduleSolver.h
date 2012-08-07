@@ -132,6 +132,8 @@ class ScheduleSolver {
 		TabuList *tabu;
 		//! Purpose of this variable is to remember total time.
 		double totalRunTime;
+		//! Total number of evaluaded schedules on the CPU.
+		uint64_t numberOfEvaluatedSchedules;
 };
 
 #endif
