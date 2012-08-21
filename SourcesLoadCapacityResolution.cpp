@@ -1,63 +1,64 @@
 #include <algorithm>
 #include <cstring>
-#include "SourcesLoad.h"
+#include "SourcesLoadCapacityResolution.h"
 
 using namespace std;
 
-SourcesLoad::SourcesLoad(const uint32_t& numRes, const uint32_t * const& capRes) : numberOfResources(numRes), capacityOfResources(capRes)	{
+SourcesLoadCapacityResolution::SourcesLoadCapacityResolution(const uint32_t& numberOfResources, const uint32_t * const& capacitiesOfResources)
+	: numberOfResources(numberOfResources), capacitiesOfResources(capacitiesOfResources)	{
 	uint32_t maxCapacity = 0;
 	resourcesLoad = new uint32_t*[numberOfResources];
 
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
-		resourcesLoad[resourceId] = new uint32_t[capacityOfResources[resourceId]];
-		memset(resourcesLoad[resourceId], 0, sizeof(uint32_t)*capacityOfResources[resourceId]);
-		maxCapacity = max(capacityOfResources[resourceId],maxCapacity);
+		resourcesLoad[resourceId] = new uint32_t[capacitiesOfResources[resourceId]];
+		memset(resourcesLoad[resourceId], 0, sizeof(uint32_t)*capacitiesOfResources[resourceId]);
+		maxCapacity = max(capacitiesOfResources[resourceId], maxCapacity);
 	}
 
 	startValues = new uint32_t[maxCapacity];
 	memset(startValues, 0, sizeof(uint32_t)*maxCapacity);
 }
 
-uint32_t SourcesLoad::getEarliestStartTime(const uint32_t * const& activityResourceRequirement)	const 	{
+uint32_t SourcesLoadCapacityResolution::getEarliestStartTime(const uint32_t * const& activityResourceRequirements, const uint32_t&, const uint32_t&) const {
 	uint32_t bestStart = 0;
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
-		uint32_t activityRequirement = activityResourceRequirement[resourceId];
+		uint32_t activityRequirement = activityResourceRequirements[resourceId];
 		if (activityRequirement > 0)
-			bestStart = max(resourcesLoad[resourceId][capacityOfResources[resourceId]-activityRequirement], bestStart);
+			bestStart = max(resourcesLoad[resourceId][capacitiesOfResources[resourceId]-activityRequirement], bestStart);
 	}
 	return bestStart;
 }
 
-void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& activityStop, const uint32_t * const& activityRequirement)	{
+void SourcesLoadCapacityResolution::addActivity(const uint32_t& activityStart, const uint32_t& activityStop, const uint32_t * const& activityRequirements)	{
 	#if DEBUG_SOURCES == 1
 	map<uint32_t,int32_t*>::iterator mit;
 	if ((mit = peaks.find(activityStart)) == peaks.end())	{
 		int32_t *peak = new int32_t[numberOfResources];
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] = -((int32_t) activityRequirement[idx]);
+			peak[idx] = -((int32_t) activityRequirements[idx]);
 		peaks[activityStart] = peak;
 	} else {
 		int32_t *peak = mit->second;
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] -= (int32_t) activityRequirement[idx];
+			peak[idx] -= (int32_t) activityRequirements[idx];
 	}
 
 	if ((mit = peaks.find(activityStop)) == peaks.end())	{
 		int32_t *peak = new int32_t[numberOfResources];
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] = (int32_t) activityRequirement[idx];
+			peak[idx] = (int32_t) activityRequirements[idx];
 		peaks[activityStop] = peak;
 	} else {
 		int32_t *peak = mit->second;
 		for (uint32_t idx = 0; idx < numberOfResources; ++idx)
-			peak[idx] += (int32_t) activityRequirement[idx];
+			peak[idx] += (int32_t) activityRequirements[idx];
 	}
 
 	int32_t lastLevel, cumulativeValue;
 	for (uint32_t r = 0; r < numberOfResources; ++r)	{
 		cumulativeValue = 0;
 		bool eraseHoles = false;
-		lastLevel = capacityOfResources[r];
+		lastLevel = capacitiesOfResources[r];
 		for (map<uint32_t,int32_t*>::reverse_iterator rit = peaks.rbegin(); rit != peaks.rend(); ++rit)	{
 			int32_t peak = rit->second[r];
 			if (peak < 0)	{
@@ -80,8 +81,8 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 
 	uint32_t **resourcesLoadCopy = new uint32_t*[numberOfResources];
 	for (uint32_t i = 0; i < numberOfResources; ++i)	{
-		resourcesLoadCopy[i] = new uint32_t[capacityOfResources[i]];
-		for (uint32_t j = 0; j < capacityOfResources[i]; ++j)
+		resourcesLoadCopy[i] = new uint32_t[capacitiesOfResources[i]];
+		for (uint32_t j = 0; j < capacitiesOfResources[i]; ++j)
 			resourcesLoadCopy[i][j] = resourcesLoad[i][j];
 	}
 	#endif
@@ -89,12 +90,12 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 	int32_t requiredSquares, timeDiff;
 	uint32_t k, c, capacityOfResource, resourceRequirement, newStartTime;
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
-		capacityOfResource = capacityOfResources[resourceId];
-		resourceRequirement = activityRequirement[resourceId];
+		capacityOfResource = capacitiesOfResources[resourceId];
+		resourceRequirement = activityRequirements[resourceId];
 		requiredSquares = resourceRequirement*(activityStop-activityStart);
 		if (requiredSquares > 0)	{
-			c = 0; k = 0;
-			newStartTime = activityStop;
+			c = 0; newStartTime = activityStop;
+			k = upper_bound(resourcesLoad[resourceId], resourcesLoad[resourceId]+capacityOfResource, activityStop, cmpMethod)-resourcesLoad[resourceId]; 
 			while (requiredSquares > 0 && k < capacityOfResource)	{
 				if (resourcesLoad[resourceId][k] < newStartTime)    {
 					if (c >= resourceRequirement)
@@ -133,7 +134,7 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 	}
 
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
-		uint32_t capacityOfResource = capacityOfResources[resourceId];
+		uint32_t capacityOfResource = capacitiesOfResources[resourceId];
 		uint32_t *startTimes = new uint32_t[capacityOfResource];
 		memset(startTimes, 0, sizeof(uint32_t)*capacityOfResource);
 
@@ -165,7 +166,7 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 		if (!correct)	{
 			cerr<<"Resource id: "<<resourceId<<endl;
 			cerr<<"activity times: "<<activityStart<<" "<<activityStop<<endl;
-			cerr<<"activity requirement: "<<activityRequirement[resourceId]<<endl;
+			cerr<<"activity requirement: "<<activityRequirements[resourceId]<<endl;
 			cerr<<"Original start times vector: "<<endl;
 			for (uint32_t i = 0; i < capacityOfResource; ++i)	{
 				cerr<<" "<<resourcesLoadCopy[resourceId][i];
@@ -201,16 +202,20 @@ void SourcesLoad::addActivity(const uint32_t& activityStart, const uint32_t& act
 	#endif
 }
 
-void SourcesLoad::printCurrentState(ostream& OUT)	const	{
+void SourcesLoadCapacityResolution::printCurrentState(ostream& output)	const	{
 	for (uint32_t resourceId = 0; resourceId < numberOfResources; ++resourceId)	{
-		OUT<<"Resource "<<resourceId+1<<":";
-		for (uint32_t capIdx = 0; capIdx < capacityOfResources[resourceId]; ++capIdx)	
-			OUT<<" "<<resourcesLoad[resourceId][capIdx];
-		OUT<<endl;
+		output<<"Resource "<<resourceId+1<<":";
+		for (uint32_t capIdx = 0; capIdx < capacitiesOfResources[resourceId]; ++capIdx)	
+			output<<" "<<resourcesLoad[resourceId][capIdx];
+		output<<endl;
 	}
 }
 
-SourcesLoad::~SourcesLoad()	{
+bool SourcesLoadCapacityResolution::cmpMethod(const uint32_t& i, const uint32_t& j)	{
+	return i > j ? true : false;
+}
+
+SourcesLoadCapacityResolution::~SourcesLoadCapacityResolution()	{
 	for (uint32_t** ptr = resourcesLoad; ptr < resourcesLoad+numberOfResources; ++ptr)
 		delete[] *ptr;
 	delete[] resourcesLoad;
