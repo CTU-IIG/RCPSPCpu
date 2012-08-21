@@ -19,5 +19,10 @@ enum TabuType {
 	SIMPLE_TABU, ADVANCED_TABU 
 };
 
+//! Algorithm selection constants.
+enum EvaluationAlgorithm {
+	CAPACITY_RESOLUTION, TIME_RESOLUTION
+};
+
 #endif
 

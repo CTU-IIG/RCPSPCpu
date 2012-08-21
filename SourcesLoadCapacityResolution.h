@@ -67,7 +67,7 @@ class SourcesLoadCapacityResolution : public SourcesLoad {
 		static bool cmpMethod(const uint32_t& i, const uint32_t& j);
 
 		//! Free all allocated memory.
-		~SourcesLoadCapacityResolution();
+		virtual ~SourcesLoadCapacityResolution();
 
 	private:
 

@@ -187,26 +187,26 @@ void InputReader::readFromStream(istream& IN) {
 	}
 }
 
-void InputReader::printInstance(ostream& OUT)	const	{
+void InputReader::printInstance(ostream& output)	const	{
 	for (uint32_t actId = 0; actId < numberOfActivities; ++actId)	{
-		OUT<<string(50,'+')<<endl;
-		OUT<<"Activity number: "<<actId+1<<endl;
-		OUT<<"Duration of activity: "<<activitiesDuration[actId]<<endl;	
-		OUT<<"Required sources (Resource ID : Units required):"<<endl;
+		output<<string(50,'+')<<endl;
+		output<<"Activity number: "<<actId+1<<endl;
+		output<<"Duration of activity: "<<activitiesDuration[actId]<<endl;	
+		output<<"Required sources (Resource ID : Units required):"<<endl;
 		for (uint32_t *resPtr = activitiesRequiredResources[actId]; resPtr < activitiesRequiredResources[actId]+totalNumberOfResources; ++resPtr)	{
-			OUT<<"\t("<<((resPtr-activitiesRequiredResources[actId])+1)<<" : "<<*resPtr<<")"<<endl;
+			output<<"\t("<<((resPtr-activitiesRequiredResources[actId])+1)<<" : "<<*resPtr<<")"<<endl;
 		}
-		OUT<<"Successors of activity:";
+		output<<"Successors of activity:";
 		for (uint32_t *sucPtr = activitiesSuccessors[actId]; sucPtr < activitiesSuccessors[actId]+activitiesNumberOfSuccessors[actId]; ++sucPtr)	{
-			OUT<<" "<<*sucPtr+1;
+			output<<" "<<*sucPtr+1;
 		}
-		OUT<<endl;
-		OUT<<string(50,'-')<<endl;
+		output<<endl;
+		output<<string(50,'-')<<endl;
 	}
-	OUT<<"Max capacity of resources:";
+	output<<"Max capacity of resources:";
 	for (uint32_t *capPtr = capacityOfResources; capPtr < capacityOfResources+totalNumberOfResources; ++capPtr)
-		OUT<<" "<<*capPtr;
-	OUT<<endl;
+		output<<" "<<*capPtr;
+	output<<endl;
 }
 
 void InputReader::allocateBaseArrays()	{

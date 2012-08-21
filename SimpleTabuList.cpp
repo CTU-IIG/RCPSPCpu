@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "SimpleTabuList.h"
 
 using namespace std;

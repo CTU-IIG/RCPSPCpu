@@ -4,83 +4,39 @@
 /*!
  * \file SourcesLoad.h
  * \author Libor Bukata
- * \brief Implementation of SourcesLoad class.
+ * \brief Abstract class for the evaluation algorithms.
  */
 
 /*!
- * Constant that is used to turn on/off debug mode for SourcesLoad class.
- * Debug mode detect error at runtime - error messages are displayed to console.
- * Two different algorithms compute new sources load vectors and compare results.
- * Debug mode check only addActivity method. Although the most difficult method in this class.
- * \warning Debug mode decrease performance in a nasty way. (more than 10 times)
- */
-#define DEBUG_SOURCES 0
-
-#include <iostream>
-#include <stdint.h>
-
-#if DEBUG_SOURCES == 1
-#include <map>
-#include <vector>
-#endif
-
-/*!
+ * Activities are put to the schedule one after another (sequence is determined by activities order)
+ * and state of the resources has to be updated correctly. This state is stored in derived classes from the SourcesLoad.
  * \class SourcesLoad
- * \brief All sources states are stored and updated in this class.
+ * \brief The SourcesLoad abstract class that defines required operations for resources evaluation.
  */
 class SourcesLoad {
 	public:
-		/*!
-		 * \param numRes Number of resources.
-		 * \param capRes Capacities of resources.
-		 * \brief Allocate sources arrays and helper arrays.
-		 */
-		SourcesLoad(const uint32_t& numRes, const uint32_t * const& capRes);
+		//! Implicit constructor.
+		SourcesLoad() { };
 
 		/*!
-		 * \param activityResourceRequirement Activity requirements.
-		 * \return The earliest start time of activity (precedence relations aren't counted).
-		 * \brief Compute earliest start time of activity with given sources requirements.
+		 * \param activityResourceRequirements Activity requirement for each available resource.
+		 * \param earliestPrecedenceStartTime The earliest start time of the activity without precedence violation.
+		 * \param activityDuration Duration of the activity.
+		 * \return The earliest activity start time without resource overload.
+		 * \brief It finds out the earliest possible activity start time without resource overload.
 		 */
-		uint32_t getEarliestStartTime(const uint32_t * const& activityResourceRequirement) const;
+		virtual uint32_t getEarliestStartTime(const uint32_t * const& activityResourceRequirements,
+			       const uint32_t& earliestPrecedenceStartTime, const uint32_t& activityDuration) const = 0;
 		/*!
-		 * \param activityStart Start time of activity.
-		 * \param activityStop Stop time of the activity. (= activityStart + activityDuration)
-		 * \param activityRequirement Activity resources requirements.
-		 * \brief Update sources vectors (arrays). This operation is irreversible.
-		 * \note Method can be debugged.
+		 * \param activityStart Scheduled start time of the activity.
+		 * \param activityStop Finish time of the scheduled activity.
+		 * \param activityRequirements Activity requirement for each available resource.
+		 * \brief It updates state of resources with respect to the added activity.
 		 */
-		void addActivity(const uint32_t& activityStart, const uint32_t& activityStop, const uint32_t * const& activityRequirement);
-		/*!
-		 * \param OUT Output stream.
-		 * \brief Print current state of resources.
-		 */
-		void printCurrentState(std::ostream& OUT = std::cout) const;
+		virtual void addActivity(const uint32_t& activityStart, const uint32_t& activityStop, const uint32_t * const& activityRequirements) = 0;
 
-		//! Free all allocated memory.
-		~SourcesLoad();
-
-	private:
-
-		//! Copy constructor is forbidden.
-		SourcesLoad(const SourcesLoad&);
-		//! Asignment operator is forbidden.
-		SourcesLoad& operator=(const SourcesLoad&);
-
-
-		//! Total number of resources.
-		const uint32_t numberOfResources;
-		//! Capacities of resources.
-		const uint32_t * const capacityOfResources;
-		//! Current state of resources.
-		uint32_t **resourcesLoad;
-		//! Helper array that is used at addActivity method.
-		uint32_t *startValues;
-
-		#if DEBUG_SOURCES == 1
-		//! Save current state of the resources as a peaks. Only in debug mode.
-		std::map<uint32_t,int32_t*> peaks;
-		#endif
+		//! Virtual implicit destructor.
+		virtual ~SourcesLoad() { };
 };
 
 #endif
