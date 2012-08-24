@@ -4,9 +4,9 @@ PROGRAM = RCPSP
 
 INST_PATH = /usr/local/bin/
 
-OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o SourcesLoad.o AdvancedTabuList.o ConfigureRCPSP.o
-INC = InputReader.h SimpleTabuList.h ScheduleSolver.h SourcesLoad.h DefaultConfigureRCPSP.h ConfigureRCPSP.h AdvancedTabuList.h TabuList.h ConstantsRCPSP.h
-SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp SourcesLoad.cpp AdvancedTabuList.cpp ConfigureRCPSP.cpp
+OBJ = InputReader.o RCPSP.o SimpleTabuList.o ScheduleSolver.o AdvancedTabuList.o ConfigureRCPSP.o SourcesLoadTimeResolution.o SourcesLoadCapacityResolution.o
+INC = InputReader.h SimpleTabuList.h ScheduleSolver.h DefaultConfigureRCPSP.h ConfigureRCPSP.h AdvancedTabuList.h TabuList.h ConstantsRCPSP.h SourcesLoad.h SourcesLoadTimeResolution.h SourcesLoadCapacityResolution.h
+SRC = RCPSP.cpp InputReader.cpp SimpleTabuList.cpp ScheduleSolver.cpp AdvancedTabuList.cpp ConfigureRCPSP.cpp SourcesLoadTimeResolution.cpp SourcesLoadCapacityResolution.cpp
 
 # If yout want to analyse performance then switch -pg (gprof) should be used. Static linkage of standard C++ library (-static-libstdc++).
 ifdef DEBUG

@@ -35,10 +35,10 @@ class ScheduleSolver {
 		void solveSchedule(const uint32_t& maxIter = ConfigureRCPSP::NUMBER_OF_ITERATIONS, const std::string& graphFilename = "");
 		/*!
 		 * \param verbose If true then verbose mode is turn on.
-		 * \param OUT Output stream.
-		 * \brief Print best found schedule, schedule length and computational time.
+		 * \param output Output stream.
+		 * \brief Print best found schedule, schedule length, computational time and number of evaluated schedules.
 		 */
-		void printBestSchedule(bool verbose = true, std::ostream& OUT = std::cout) const;
+		void printBestSchedule(bool verbose = true, std::ostream& output = std::cout);
 
 		//! Free all allocated resources.
 		~ScheduleSolver();
@@ -47,29 +47,57 @@ class ScheduleSolver {
 
 		//! Compute predecessors, matrix of successors and create init activities order.
 		void createInitialSolution();
+
+		/*!
+		 * \param scheduleOrder Order of activities that should be evaluated.
+		 * \param verbose If true then verbose mode is turn on.
+		 * \param output Output stream.
+		 * \brief Print schedule, schedule length, precedence penalty and number of evaluated schedules.
+		 */
+		void printSchedule(const uint32_t * const& scheduleOrder, bool verbose = true, std::ostream& output = std::cout);
+
 		/*!
 		 * \param order Activities order.
-		 * \param startTimesWriter Start times of the activities can be written to this array. Order is the same as the order parameter.
-		 * \param startTimesWriterById Start times of the activities can be written to this array. Order is defined by activities ID's.
+		 * \param relatedActivities It's array of successors or predecessors. It depends on a way of evaluation (forward, backward).
+		 * \param numberOfRelatedActivities Number of successors/predecessors for each activity.
+		 * \param timeValuesById The earliest start time values for forward evaluation
+		 * and transformed time values for backward evaluation.
+		 * \param forwardEvaluation It determines if forward or backward schedule is evaluated.
 		 * \return Length of the schedule.
-		 * \brief Input order is evaluated and start times are determined. Total schedule length is returned.
-		 * \warning Order of activities is sequence of putting to the schedule, start time values don't have to be ordered ascendly.
+		 * \brief Input order is evaluated and the earliest start/transformed time values are computed.
+		 * \warning Order of activities is sequence of putting to the schedule, time values don't have to be ordered.
 		 */
-		uint32_t evaluateOrder(const uint32_t * const& order, uint32_t *startTimesWriter = NULL, uint32_t *startTimesWriterById = NULL) const;
+		uint32_t evaluateOrder(const uint32_t * const& order, const uint32_t * const * const& relatedActivities,
+			       const uint32_t * const& numberOfRelatedActivities, uint32_t *& timeValuesById, bool forwardEvaluation) const;
 		/*!
-		 * \param startTimesById Start times of activities ordered by ID's.
+		 * \param order The sequence of putting to the schedule. It's activity order.
+		 * \param startTimesById The earliest start time values for each scheduled activity.
+		 * \return Project makespan, i.e. the length of the schedule.
+		 * \brief It evaluates order of activities and determines the earliest start time values.
+		 */
+		uint32_t forwardScheduleEvaluation(const uint32_t * const& order, uint32_t *& startTimesById) const;
+		/*!
+		 * \param order The sequence of putting to the schedule. It's activity order.
+		 * \param startTimesById The latest start time values for each scheduled activity.
+		 * \return Project makespan, i.e. the length of the schedule.
+		 * \brief It evaluates order (in reverse order) of activities and determines the latest start time values.
+		 */
+		uint32_t backwardScheduleEvaluation(const uint32_t * const& order, uint32_t *& startTimesById) const;
+		/*!
+		 * \param order Order of activities. It determines the order of putting to the schedule.
+		 * \param bestScheduleStartTimesById The earliest start time values for the best found schedule.
+		 * \return Project makespan, i.e. the length of the schedule.
+		 * \brief Iterative method tries to shake down activities in the schedule to ensure equally loaded resources.
+		 * Therefore, the shorter schedule could be found.
+		 */
+		uint32_t shakingDownEvaluation(const uint32_t * const& order, uint32_t *bestScheduleStartTimesById);
+		/*!
+		 * \param startTimesById Start time values of activities ordered by ID's.
 		 * \return Precedence penalty of the schedule.
 		 * \brief Method compute precedence penalty (= broken relation between two activities) of the schedule.
 		 * \note Because precedence free swaps and shifts are currently used, this function is only for debugging purposes.
 		 */
 		uint32_t computePrecedencePenalty(const uint32_t * const& startTimesById) const;
-		/*!
-		 * \param scheduleOrder Order of activities that should be evaluated.
-		 * \param verbose If true then verbose mode is turn on.
-		 * \param OUT Output stream.
-		 * \brief Print schedule and schedule length. 
-		 */
-		void printSchedule(const uint32_t * const& scheduleOrder, bool verbose = true, std::ostream& OUT = std::cout) const;
 		/*!
 		 * \param i Index at activitiesOrder.
 		 * \param j Index at activitiesOrder.
@@ -77,6 +105,21 @@ class ScheduleSolver {
 		 * \brief Method check if candidate for swap is precedence penalty free.
 		 */
 		bool checkSwapPrecedencePenalty(uint32_t i, uint32_t j) const;
+
+		/*!
+		 * \param order Original activities order.
+		 * \param startTimesById The earliest start time values in the order W.
+		 * \brief It transforms the earliest start time values to the order W. The order W is written to the variable order.
+		 */
+		void convertStartTimesById2ActivitiesOrder(uint32_t *order, const uint32_t * const& startTimesById) const;
+		/*!
+		 * \param order Order of activities.
+		 * \param timeValuesById Assigned time values to activities, it is used for sorting input order.
+		 * \param size It's size of the arrays, i.e. number of project activities.
+		 * \brief Input order of activities is sorted in accordance with time values. It's stable sort.
+		 */
+		static void insertSort(uint32_t* order, const uint32_t * const& timeValuesById, const int32_t& size);
+
 		/*!
 		 * \param order Activities order.
 		 * \param diff Direction and norm of shift move.
@@ -84,6 +127,7 @@ class ScheduleSolver {
 		 * \brief Change activities order. Activity at index baseIdx is shifted to the left or to the right (diff parameter). 
 		 */
 		void makeShift(uint32_t * const& order, const int32_t& diff, const uint32_t& baseIdx)	const;
+
 		//! Random swaps are performed when diversification is called.
 		void makeDiversification();
 
@@ -130,6 +174,14 @@ class ScheduleSolver {
 		uint32_t costOfBestSchedule;
 		//! Tabu list instance.
 		TabuList *tabu;
+		//! Upper bound of Cmax (sum of all activity durations).
+		uint32_t upperBoundMakespan;
+		//! Current selected version of resources evaluation algorithm.
+		EvaluationAlgorithm algo;
+		//! Required evaluation time per iteration for evaluation algorithm TIME_RESOLUTION.
+		double reqTimePerIterForTimeResAlg;
+		//! Required evaluation time per iteration for evaluation algorithm CAPACITY_RESOLUTION.
+		double reqTimePerIterForCapacityResAlg;
 		//! Purpose of this variable is to remember total time.
 		double totalRunTime;
 		//! Total number of evaluaded schedules on the CPU.
