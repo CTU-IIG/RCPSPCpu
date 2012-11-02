@@ -44,6 +44,8 @@ namespace ConfigureRCPSP {
 	extern uint32_t DIVERSIFICATION_SWAPS;
 	//! Do you want a write csv file? Makespan criterion dependent on number of iterations.
 	extern bool WRITE_GRAPH;
+	//! Do you want to write a result file with the encoded best schedule? 
+	extern bool WRITE_RESULT_FILE;
 }
 
 #endif

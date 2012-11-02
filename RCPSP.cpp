@@ -92,6 +92,9 @@ int rcpsp(int argc, char* argv[])	{
 		if (arg == "--write-makespan-graph" || arg == "-wmg")
 			ConfigureRCPSP::WRITE_GRAPH = true;
 
+		if (arg == "--write-result-file" || arg == "-wrf")
+			ConfigureRCPSP::WRITE_RESULT_FILE = true;
+
 		try {
 			if (arg == "--number-of-iterations" || arg == "-noi")
 				ConfigureRCPSP::NUMBER_OF_ITERATIONS = optionHelper<uint32_t>("--number-of-iterations", i, argc, argv);
@@ -147,7 +150,10 @@ int rcpsp(int argc, char* argv[])	{
 			cout<<"\t\t"<<"Number of performed swaps for every diversification."<<endl;
 			cout<<"\t"<<"--write-makespan-graph, -wmg"<<endl;
 			cout<<"\t\t"<<"If you want to write makespan criterion graph (independent variable is number of iterations)"<<endl;
-			cout<<"\t\t"<<"then use this switch to enable csv file generation."<<endl<<endl;
+			cout<<"\t\t"<<"then use this switch to enable csv file generation."<<endl;
+			cout<<"\t"<<"--write-result-file, -wrf"<<endl;
+			cout<<"\t\t"<<"Add this option if you want to write a file with the best schedule."<<endl;
+			cout<<"\t\t"<<"This file is binary."<<endl<<endl;
 			cout<<"Default values can be modified at \"DefaultConfigureRCPSP.h\" file."<<endl;
 			return 0;
 		}
@@ -164,15 +170,19 @@ int rcpsp(int argc, char* argv[])	{
 			// Init schedule solver.
 			ScheduleSolver solver(reader);
 			// Solve read instance.	
-			string graphFilename = "";
-			if (ConfigureRCPSP::WRITE_GRAPH == true)	{
+			string graphFilename = "", resultFilename = "";
+			if (ConfigureRCPSP::WRITE_GRAPH == true || ConfigureRCPSP::WRITE_RESULT_FILE == true)	{
 				int32_t i;
 				for (i = filename.size()-1; i >= 0; --i)	{
 					if (filename[i] == '.')
 						break;
 				}
-				if (i > 0)
-					graphFilename = string(filename, 0, i) + ".csv";
+				if (i > 0)	{
+					if (ConfigureRCPSP::WRITE_GRAPH == true)
+						graphFilename = string(filename, 0, i) + ".csv";
+					if (ConfigureRCPSP::WRITE_RESULT_FILE == true)
+						resultFilename = string(filename, 0, i) + ".res";
+				}
 			}
 			solver.solveSchedule(ConfigureRCPSP::NUMBER_OF_ITERATIONS, graphFilename);
 			// Print results.
@@ -182,6 +192,9 @@ int rcpsp(int argc, char* argv[])	{
 				cout<<filename<<": "; 
 				solver.printBestSchedule(false);
 			}
+			// Write the best schedule to file.
+			if (!resultFilename.empty())
+				solver.writeBestScheduleToFile(resultFilename);
 		}
 	} catch (exception& e)	{
 		cerr<<e.what()<<endl;
