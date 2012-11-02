@@ -57,6 +57,7 @@ class ScheduleSolver {
 		/*!
 		 * \param startActivityId The id of the start activity of the project.
 		 * \param energyReasoning The energy requirements are taken into account if energyReasoning variable is set to true.
+		 * \return The earliest start time for each activity.
 		 * \brief Lower bounds of the earliest start time values are computed for each activity.
 		 */
 		uint32_t* computeLowerBounds(const uint32_t& startActivityId, const bool& energyReasoning = false) const;
@@ -64,6 +65,7 @@ class ScheduleSolver {
 		/*!
 		 * \param makespan The considered project duration is taken as a reference to upper bound computations.
 		 * \param startTimesById The start time value for each activity.
+		 * \return The sum of overhangs, i.e. the penalty.
 		 * \brief The penalty is computed as a sum of overhangs. Overhang of the activity is the difference between the latest
 		 * activity finish time and the real finish time if real finish time > the latest finish time.
 		 */
@@ -83,6 +85,7 @@ class ScheduleSolver {
 		/*!
 		 * \param lb The lower bounds of the start time values.
 		 * \param ub The upper bounds of the finish time values.
+		 * \return It returns false if consistency is detected else true.
 		 * \brief It tests feasibility of schedules with given time windows.
 		 */
 		bool checkWindows(uint32_t *lb, uint32_t *ub) const;
@@ -174,17 +177,17 @@ class ScheduleSolver {
 		 * \param activityId The activity from which all related activities are found.
 		 * \param numberOfRelated The number of related activities for each activity.
 		 * \param related The related (= successors || predecessors) activities for each activity in the project.
-		 * \brief It returns all activityId's successors or predecessors.
+		 * \return It returns all activityId's successors or predecessors.
 		 */
 		std::vector<uint32_t> getAllRelatedActivities(uint32_t activityId, uint32_t *numberOfRelated, uint32_t **related) const;
 		/*!
 		 * \param activityId Identification of the activity.
-		 * \brief It returns all activityId's successors.
+		 * \return It returns all activityId's successors.
 		 */
 		std::vector<uint32_t> getAllActivitySuccessors(const uint32_t& activityId) const;
 		/*!
 		 * \param activityId Identification of the activity.
-		 * \brief It returns all activityId's predecessors.
+		 * \return It returns all activityId's predecessors.
 		 */
 		std::vector<uint32_t> getAllActivityPredecessors(const uint32_t& activityId) const;
 
