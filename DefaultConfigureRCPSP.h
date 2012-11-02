@@ -38,6 +38,8 @@
 #define DEFAULT_DIVERSIFICATION_SWAPS 10
 //! Do you want to write makespan criterion graph (independent variable is iteration number). As a result you obtain csv file. (1 == true, 0 == false)
 #define DEFAULT_WRITE_GRAPH 0
+//! If you want to write the best schedule to a file set this variable to 1.
+#define DEFAULT_WRITE_RESULT_FILE 0
 
 #endif
 

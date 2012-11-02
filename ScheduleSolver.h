@@ -8,6 +8,7 @@
  */
 
 #include <iostream>
+#include <string>
 #include "ConfigureRCPSP.h"
 #include "InputReader.h"
 #include "TabuList.h"
@@ -39,6 +40,11 @@ class ScheduleSolver {
 		 * \brief Print best found schedule, schedule length, computational time and number of evaluated schedules.
 		 */
 		void printBestSchedule(bool verbose = true, std::ostream& output = std::cout);
+		/*!
+		 * \param fileName The name of the file where results will be written.
+		 * \brief It writes required data structures and the best schedule to the given file.
+		 */
+		void writeBestScheduleToFile(const std::string& fileName);
 
 		//! Free all allocated resources.
 		~ScheduleSolver();
@@ -47,6 +53,42 @@ class ScheduleSolver {
 
 		//! Compute predecessors, matrix of successors and create init activities order.
 		void createInitialSolution();
+		
+		/*!
+		 * \param startActivityId The id of the start activity of the project.
+		 * \param energyReasoning The energy requirements are taken into account if energyReasoning variable is set to true.
+		 * \return The earliest start time for each activity.
+		 * \brief Lower bounds of the earliest start time values are computed for each activity.
+		 */
+		uint32_t* computeLowerBounds(const uint32_t& startActivityId, const bool& energyReasoning = false) const;
+		
+		/*!
+		 * \param makespan The considered project duration is taken as a reference to upper bound computations.
+		 * \param startTimesById The start time value for each activity.
+		 * \return The sum of overhangs, i.e. the penalty.
+		 * \brief The penalty is computed as a sum of overhangs. Overhang of the activity is the difference between the latest
+		 * activity finish time and the real finish time if real finish time > the latest finish time.
+		 */
+		uint32_t computeUpperBoundsOverhangPenalty(const uint32_t& makespan, const uint32_t * const& startTimesById) const;
+
+		/*!
+		 * \param makespan The best project duration without precedence breaking or resource overloading.
+		 * \brief It tries to improve time windows (LB_i-UB_i).
+		 */
+		void tryToImproveBounds(const uint32_t& makespan);
+		/*!
+		 * \param lb The earliest start time values.
+		 * \param ub The latest finish time values.
+		 * \brief It tries to improve estimates of the earliest activity start time values.
+		 */
+		void timeTableEdgeFinder(uint32_t *lb, uint32_t *ub);
+		/*!
+		 * \param lb The lower bounds of the start time values.
+		 * \param ub The upper bounds of the finish time values.
+		 * \return It returns false if consistency is detected else true.
+		 * \brief It tests feasibility of schedules with given time windows.
+		 */
+		bool checkWindows(uint32_t *lb, uint32_t *ub) const;
 
 		/*!
 		 * \param scheduleOrder Order of activities that should be evaluated.
@@ -131,6 +173,25 @@ class ScheduleSolver {
 		//! Random swaps are performed when diversification is called.
 		void makeDiversification();
 
+		/*!
+		 * \param activityId The activity from which all related activities are found.
+		 * \param numberOfRelated The number of related activities for each activity.
+		 * \param related The related (= successors || predecessors) activities for each activity in the project.
+		 * \return It returns all activityId's successors or predecessors.
+		 */
+		std::vector<uint32_t> getAllRelatedActivities(uint32_t activityId, uint32_t *numberOfRelated, uint32_t **related) const;
+		/*!
+		 * \param activityId Identification of the activity.
+		 * \return It returns all activityId's successors.
+		 */
+		std::vector<uint32_t> getAllActivitySuccessors(const uint32_t& activityId) const;
+		/*!
+		 * \param activityId Identification of the activity.
+		 * \return It returns all activityId's predecessors.
+		 */
+		std::vector<uint32_t> getAllActivityPredecessors(const uint32_t& activityId) const;
+
+
 	private:
 
 		//! Copy constructor is forbidden.
@@ -174,6 +235,10 @@ class ScheduleSolver {
 		uint32_t costOfBestSchedule;
 		//! Tabu list instance.
 		TabuList *tabu;
+		//! The longest paths from the left to the right in the instance graph.
+		uint32_t *leftRightLongestPaths;
+		//! The longest paths from the end activity in the transformed graph.
+		uint32_t *rightLeftLongestPaths;
 		//! Upper bound of Cmax (sum of all activity durations).
 		uint32_t upperBoundMakespan;
 		//! Current selected version of resources evaluation algorithm.
