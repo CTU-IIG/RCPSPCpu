@@ -349,7 +349,6 @@ ScheduleSolver::~ScheduleSolver()	{
 	delete[] relationMatrix;
 
 	delete[] rightLeftLongestPaths;
-	delete[] leftRightLongestPaths;
 
 	delete tabu;
 }
@@ -455,8 +454,6 @@ void ScheduleSolver::createInitialSolution()	{
 		criticalPathMakespan = -1;
 	delete[] lb1;
 
-	/* It computes the longest paths from the start dummy activity to others. */
-	leftRightLongestPaths = computeLowerBounds(0, true);
 	/*
 	 * It transformes the instance graph. Directions of edges are changed.
 	 * The longest paths are computed from the end dummy activity to the others.
@@ -477,8 +474,6 @@ void ScheduleSolver::createInitialSolution()	{
 	copy(activitiesOrder, activitiesOrder+numberOfActivities, outBestSchedule);
 
 	delete[] bestScheduleStartTimesById;
-
-//	tryToImproveBounds(105);
 }
 
 uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, const bool& energyReasoning) const {
@@ -608,206 +603,6 @@ uint32_t ScheduleSolver::computeUpperBoundsOverhangPenalty(const uint32_t& makes
 		}
 	}
 	return overhangPenalty;
-}
-
-void ScheduleSolver::tryToImproveBounds(const uint32_t& makespan)	{
-	bool improved = true;
-	// It computes initial values of bounds;
-	uint32_t *lb = new uint32_t[numberOfActivities], *ub = new uint32_t[numberOfActivities];
-	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		lb[i] = leftRightLongestPaths[i];
-		ub[i] = makespan-rightLeftLongestPaths[i];
-	}
-
-	while (improved == true)	{
-		int32_t sumOfLBs1 = accumulate(lb, lb+numberOfActivities, 0);
-		timeTableEdgeFinder(lb, ub);
-		int32_t sumOfLBs2 = accumulate(lb, lb+numberOfActivities, 0);
-		if (!checkWindows(lb,ub))	{
-			cerr<<"Invalid edge finder!"<<endl;
-		}
-
-		/* 
-		 * Dual task - try to improve upper bounds.
-		 * LB_i' = C_{max}-UB_i
-		 * UB_i' = C_{max}-LB_i
-		 */
-		int32_t sumOfUBs1 = accumulate(ub, ub+numberOfActivities, 0);
-		for (uint32_t a = 0; a < numberOfActivities; ++a)	{
-			int32_t lbTransformed = makespan-ub[a];
-			ub[a] = makespan-lb[a];
-			lb[a] = lbTransformed;
-		}
-		timeTableEdgeFinder(lb, ub);
-		/*
-		 * Backward transform
-		 * UB_i = C_{max}-LB_i'
-		 * LB_i = C_{max}-UB_i'
-		 */
-		for (uint32_t a = 0; a < numberOfActivities; ++a)	{
-			int32_t newUB = makespan-lb[a];
-			lb[a] = makespan-ub[a];
-			ub[a] = newUB;
-		}
-		int32_t sumOfUBs2 = accumulate(ub, ub+numberOfActivities, 0);
-		if (!checkWindows(lb,ub))	{
-			cerr<<"Invalid edge finder!"<<endl;
-		}
-
-		if (!((sumOfLBs1 != sumOfLBs2) || (sumOfUBs1 != sumOfUBs2)))
-			improved = false;
-	}
-
-	delete[] lb; delete[] ub;
-}
-
-void ScheduleSolver::timeTableEdgeFinder(uint32_t *lb, uint32_t *ub)	{
-	struct BoundInfo {
-		int32_t activityId;
-		int32_t bound;
-
-		static bool cmp(const BoundInfo& x, const BoundInfo& y) {
-			return (x.bound < y.bound) ? true : false;
-		}
-	};
-
-	// The earliest start time of an activity.
-	int32_t *est = (int32_t*) lb;
-	// The latest completion time of an activity.
-	int32_t *lct = (int32_t*) ub;
-	// The earliest start time of an activity - sorted sequence.
-	BoundInfo *estSorted = new BoundInfo[numberOfActivities];
-	// The latest completion time of an activity - sorted sequence.
-	BoundInfo *lctSorted = new BoundInfo[numberOfActivities];
-	// The latest start time of an activity.
-	int32_t *lst = new int32_t[numberOfActivities];
-	// The earliest completion time of an activity.
-	int32_t *ect = new int32_t[numberOfActivities];
-	// The fixed energy of an activity.
-	int32_t *fixedPartDuration = new int32_t[numberOfActivities];
-	// The float energy of an activity.
-	int32_t **floatEnergy = new int32_t*[numberOfActivities];
-	// The latest start time of the float part of an activity.
-	int32_t *lstFloat = new int32_t[numberOfActivities];
-
-	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		estSorted[i].activityId = lctSorted[i].activityId = i;
-		estSorted[i].bound = est[i];
-		lctSorted[i].bound = lct[i];
-		lst[i] = lct[i]-activitiesDuration[i];
-		ect[i] = est[i]+activitiesDuration[i];
-		fixedPartDuration[i] = max(0,ect[i]-lst[i]);
-		floatEnergy[i] = new int32_t[numberOfResources];
-		for (uint32_t k = 0; k < numberOfResources; ++k)
-			floatEnergy[i][k] = activitiesResources[i][k]*(activitiesDuration[i]-fixedPartDuration[i]);
-		lstFloat[i] = lct[i]-(activitiesDuration[i]-fixedPartDuration[i]);
-	}
-
-	sort(estSorted, estSorted+numberOfActivities, BoundInfo::cmp);
-	sort(lctSorted, lctSorted+numberOfActivities, BoundInfo::cmp);
-
-	for (uint32_t k = 0; k < numberOfResources; ++k)	{
-		for (int32_t y = numberOfActivities-1; y >= 0; --y)	{
-			if (y+1 < ((int32_t) numberOfActivities) && lctSorted[y].bound == lctSorted[y+1].bound)	{
-				// On the GPU the array could be shrinked.
-				continue;
-			}
-			BoundInfo b = lctSorted[y];
-			int32_t end = b.bound, sumOfFloatEnergy = 0, u = -1, enReqU = 0;
-			for (int32_t x = numberOfActivities-1; x >= 0; --x)	{
-				BoundInfo a = estSorted[x];
-				int32_t begin = a.bound, idA = a.activityId, reqA = activitiesResources[idA][k];
-				if (end <= begin)
-					continue;
-				if (lct[idA] <= end)	{
-					sumOfFloatEnergy += floatEnergy[idA][k];
-				} else {
-					int32_t enIn = reqA*max(0, end-lstFloat[idA]);
-					sumOfFloatEnergy += enIn;
-					int32_t enReqA = min(floatEnergy[idA][k], reqA*(end-begin))-enIn;
-					if (enReqA > enReqU)	{
-						u = idA; enReqU = enReqA;
-					}
-				}
-				int32_t sumOfFixedEnergy = 0;
-				for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-					int32_t fixedDuration = fixedPartDuration[i];
-					if (fixedDuration > 0 && ect[i] > begin && lst[i] < end)	{
-						int32_t intervalFixPart = min(end-begin, min(fixedDuration, min(ect[i]-begin, end-lst[i])));
-						sumOfFixedEnergy += activitiesResources[i][k]*intervalFixPart;
-					}
-				}
-
-				int32_t avail = capacityOfResources[k]*(end-begin)-sumOfFloatEnergy-sumOfFixedEnergy;
-				if (enReqU > 0 && avail-enReqU < 0)	{
-					int32_t reqU = activitiesResources[u][k];
-					int32_t rest = reqU*(end-begin)-avail-reqU*max(0, end-lst[u]);
-					int32_t lbU = begin+(((rest % reqU) == 0) ? rest/reqU : rest/reqU+1);
-					if (lbU > est[u])	{
-						cout<<est[u]<<" -> "<<lbU<<endl;
-						est[u] = lbU;
-					}
-				}
-			}
-		}
-	}
-
-	delete[] lstFloat;
-	for (uint32_t i = 0; i < numberOfActivities; ++i)
-		delete[] floatEnergy[i];
-	delete[] floatEnergy; delete[] fixedPartDuration;
-	delete[] ect; delete[] lst;
-	delete[] lctSorted; delete[] estSorted;
-}
-
-bool ScheduleSolver::checkWindows(uint32_t *lb, uint32_t *ub) const	{
-	bool correct = true;
-	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		if (lb[i]+activitiesDuration[i] > ub[i])	{
-			cerr<<"Invalid time window - "<<i<<": "<<"<"<<lb[i]<<","<<ub[i]<<">"<<endl;
-			correct = false;
-		}
-	}
-
-	uint32_t *sortedLBs = new uint32_t[numberOfActivities];
-	uint32_t *sortedUBs = new uint32_t[numberOfActivities];
-	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		sortedLBs[i] = lb[i];
-		sortedUBs[i] = ub[i];
-	}
-	sort(sortedLBs, sortedLBs+numberOfActivities);
-	sort(sortedUBs, sortedUBs+numberOfActivities);
-
-	for (uint32_t k = 0; k < numberOfResources; ++k)	{
-		for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-			for (uint32_t j = 0; j < numberOfActivities; ++j)	{
-				if (sortedLBs[i] < sortedUBs[i])	{
-					int32_t begin = sortedLBs[i], end = sortedUBs[i];
-					int64_t intervalEnergy = 0, maxAvailableEnergy = capacityOfResources[k]*(end-begin);
-					for (uint32_t id = 0; id < numberOfActivities; ++id)	{
-						if (((int32_t ) lb[id]) < end && ((int32_t) ub[id]) > begin)	{
-							int32_t dur = activitiesDuration[id];
-							int32_t req = activitiesResources[id][k];
-							int32_t minFloatTime = min(dur, min(end-begin, min(((int32_t) lb[id])+dur-begin, end-(((int32_t) ub[id])-dur))));
-							intervalEnergy += req*minFloatTime;
-						}
-					}
-
-					if (intervalEnergy > maxAvailableEnergy)	{
-						cerr<<"Resources are overloaded -> infeasible solution!"<<endl;
-						cerr<<"Resource "<<k<<": ("<<begin<<","<<end<<") "<<intervalEnergy<<"/"<<maxAvailableEnergy<<endl;
-						correct = false;
-					}
-				}
-			}
-		}
-	}
-
-
-	delete[] sortedLBs;
-	delete[] sortedUBs;
-
-	return correct;
 }
 
 void ScheduleSolver::printSchedule(const uint32_t * const& scheduleOrder, bool verbose, ostream& output)	{

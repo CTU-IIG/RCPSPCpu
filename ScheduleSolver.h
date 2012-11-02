@@ -72,25 +72,6 @@ class ScheduleSolver {
 		uint32_t computeUpperBoundsOverhangPenalty(const uint32_t& makespan, const uint32_t * const& startTimesById) const;
 
 		/*!
-		 * \param makespan The best project duration without precedence breaking or resource overloading.
-		 * \brief It tries to improve time windows (LB_i-UB_i).
-		 */
-		void tryToImproveBounds(const uint32_t& makespan);
-		/*!
-		 * \param lb The earliest start time values.
-		 * \param ub The latest finish time values.
-		 * \brief It tries to improve estimates of the earliest activity start time values.
-		 */
-		void timeTableEdgeFinder(uint32_t *lb, uint32_t *ub);
-		/*!
-		 * \param lb The lower bounds of the start time values.
-		 * \param ub The upper bounds of the finish time values.
-		 * \return It returns false if consistency is detected else true.
-		 * \brief It tests feasibility of schedules with given time windows.
-		 */
-		bool checkWindows(uint32_t *lb, uint32_t *ub) const;
-
-		/*!
 		 * \param scheduleOrder Order of activities that should be evaluated.
 		 * \param verbose If true then verbose mode is turn on.
 		 * \param output Output stream.
@@ -235,8 +216,6 @@ class ScheduleSolver {
 		uint32_t costOfBestSchedule;
 		//! Tabu list instance.
 		TabuList *tabu;
-		//! The longest paths from the left to the right in the instance graph.
-		uint32_t *leftRightLongestPaths;
 		//! The longest paths from the end activity in the transformed graph.
 		uint32_t *rightLeftLongestPaths;
 		//! Upper bound of Cmax (sum of all activity durations).
