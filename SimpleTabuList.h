@@ -56,7 +56,6 @@ class SimpleTabuList : public TabuList {
 		//! Free all allocated resources. (i.e. tabu list and tabu hash)
 		virtual ~SimpleTabuList();
 
-
 	private:
 
 		//! Copy constructor is forbidden.
