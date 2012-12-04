@@ -454,16 +454,20 @@ void ScheduleSolver::createInitialSolution()	{
 		criticalPathMakespan = -1;
 	delete[] lb1;
 
+	/* IT FILLS THE CACHES OF SUCCESSORS/PREDECESSORS */
+	for (uint32_t id = 0; id < numberOfActivities; ++id)	{
+		allSuccessorsCache.push_back(getAllActivitySuccessors(id));
+		allPredecessorsCache.push_back(getAllActivityPredecessors(id));
+	}
+
 	/*
 	 * It transformes the instance graph. Directions of edges are changed.
 	 * The longest paths are computed from the end dummy activity to the others.
 	 * After that the graph is transformed back.
 	 */
-	swap(numberOfSuccessors, numberOfPredecessors);
-	swap(activitiesSuccessors, activitiesPredecessors);
+	changeDirectionOfEdges();
 	rightLeftLongestPaths = computeLowerBounds(numberOfActivities-1, true);
-	swap(numberOfSuccessors, numberOfPredecessors);
-	swap(activitiesSuccessors, activitiesPredecessors);
+	changeDirectionOfEdges();
 
 	/* CREATE AND COPY INITIAL SCHEDULE TO THE BEST SCHEDULE */
 
@@ -538,8 +542,8 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 						uint32_t minimalResourceStartTime = 0;
 						for (set<uint32_t>::const_iterator sit = startNodesOfMultiPaths.begin(); sit != startNodesOfMultiPaths.end(); ++sit)	{
 							// Vectors are sorted by activity id's.
-							vector<uint32_t> allSuccessors = getAllActivitySuccessors(*sit);
-							vector<uint32_t> allPredecessors = getAllActivityPredecessors(activityId);
+							const vector<uint32_t>& allSuccessors = allSuccessorsCache[*sit];
+							const vector<uint32_t>& allPredecessors = allPredecessorsCache[activityId];
 							// The vector of all activities between the activity "i" and activity "j".
 							vector<uint32_t> intersectionOfActivities;
 							set_intersection(allPredecessors.begin(), allPredecessors.end(), allSuccessors.begin(),
@@ -554,8 +558,7 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 								if ((sumOfEnergy % capacityOfResources[k]) != 0)
 									++timeInterval;
 								
-								minimalResourceStartTime = max(minimalResourceStartTime, 
-										maxDistances[*sit]+activitiesDuration[*sit]+timeInterval); 
+								minimalResourceStartTime = max(minimalResourceStartTime, maxDistances[*sit]+activitiesDuration[*sit]+timeInterval); 
 							}
 						}
 						minimalStartTime = max(minimalStartTime, minimalResourceStartTime);
@@ -593,6 +596,111 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 	delete[] closedActivities; 
 
 	return maxDistances;
+}
+
+uint32_t ScheduleSolver::lowerBoundOfMakespan() {
+
+	struct ListActivity {
+		ListActivity(uint32_t id, uint32_t par, uint32_t d) : activityId(id), concurrencyCoeff(par), duration(d) { };
+		bool operator<(const ListActivity& x) const {
+			if (concurrencyCoeff < x.concurrencyCoeff)
+				return true;
+			else if (concurrencyCoeff > x.concurrencyCoeff)
+				return false;
+			else if (duration > x.duration)
+				return true;
+			else
+				return false;
+		}
+
+		uint32_t activityId;
+		uint32_t concurrencyCoeff; 
+		uint32_t duration;
+	};
+
+	bool **simultaneousActivities = new bool*[numberOfActivities];
+	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+		// All activities are set to run simultaneously with each other.
+		simultaneousActivities[i] = new bool[numberOfActivities];
+		fill(simultaneousActivities[i], simultaneousActivities[i]+numberOfActivities, true);
+
+		// All successors and predecessors of activity "i" cannot be run concurrently with activity "i".
+		vector<uint32_t> timeDisjunctiveActivities = allSuccessorsCache[i];
+		vector<uint32_t> disjunctivePredecessors = allPredecessorsCache[i];
+		timeDisjunctiveActivities.insert(timeDisjunctiveActivities.end(), disjunctivePredecessors.begin(), disjunctivePredecessors.end());
+		for (vector<uint32_t>::const_iterator it = timeDisjunctiveActivities.begin(); it != timeDisjunctiveActivities.end(); ++it)
+			simultaneousActivities[i][*it] = false;
+		
+		// Resource availabilities must be checked.
+		for (uint32_t j = 0; j < numberOfActivities; ++j)	{
+			if (j != i)	{
+				for (uint32_t k = 0; k < numberOfResources; ++k)	{
+					if (activitiesResources[i][k]+activitiesResources[j][k] > capacityOfResources[k])	{
+						simultaneousActivities[i][j] = false;
+						break;
+					}
+				}
+			} else {
+				simultaneousActivities[i][j] = false;
+			}
+		}
+	}
+
+	// It creates the list of activities.
+	vector<ListActivity> listOfActivities;
+	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+		uint32_t concurrencyLevel = 0;
+		for (uint32_t j = 0; j < numberOfActivities; ++j)	{
+			if (simultaneousActivities[i][j])
+				++concurrencyLevel;
+		}
+		listOfActivities.push_back(ListActivity(i, concurrencyLevel, activitiesDuration[i]));
+	}
+	
+	// A sorting heuristic is applied to the list.
+	sort(listOfActivities.begin(), listOfActivities.end());
+
+	uint32_t maximalLowerBound = 0, lowerBound = 0;
+	uint32_t *activityDurationsBackup = activitiesDuration;
+	activitiesDuration = new uint32_t[numberOfActivities];
+	copy(activityDurationsBackup, activityDurationsBackup+numberOfActivities, activitiesDuration);
+	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
+		// It computes an estimate of the lower bound.
+		changeDirectionOfEdges();
+		uint32_t *ub = computeLowerBounds(numberOfActivities-1, true);
+		changeDirectionOfEdges();
+		uint32_t *lb = computeLowerBounds(0, true);
+		maximalLowerBound = max(maximalLowerBound, lowerBound+max(lb[numberOfActivities-1], ub[0]));
+		delete[] lb; delete[] ub;
+
+		// It creates the new subset of the unprocessed activities.
+		uint32_t activityId1 = listOfActivities[i].activityId, subsetDuration = listOfActivities[i].duration;
+		if (subsetDuration > 0)	{
+			// All activities which are able to run concurrently with activity "activityId1" have reduced duration.
+			for (uint32_t j = i+1; j < numberOfActivities; ++j)	{
+				if (j != i)	{
+					uint32_t durationJ = listOfActivities[j].duration;
+					uint32_t activityId2 = listOfActivities[j].activityId;
+					if (simultaneousActivities[activityId1][activityId2] == true && durationJ > 0)
+						activitiesDuration[activityId2] = listOfActivities[j].duration = ((durationJ > subsetDuration) ? durationJ-subsetDuration : 0);
+				}
+			}
+
+			// Remove the selected activity from the list.
+			activitiesDuration[activityId1] = listOfActivities[i].duration = 0;
+			lowerBound += subsetDuration;
+		}
+	}
+
+	// It restores the durations of the activities.
+	delete[] activitiesDuration;
+	activitiesDuration = activityDurationsBackup;
+
+	for (uint32_t i = 0; i < numberOfActivities; ++i)
+		delete[] simultaneousActivities[i];
+	delete[] simultaneousActivities;
+
+	return maximalLowerBound;
 }
 
 uint32_t ScheduleSolver::computeUpperBoundsOverhangPenalty(const uint32_t& makespan, const uint32_t * const& startTimesById)	const	{
@@ -800,6 +908,13 @@ void ScheduleSolver::makeDiversification()	{
 			++performedSwaps;
 		}
 	}
+}
+
+void ScheduleSolver::changeDirectionOfEdges()	{
+	swap(numberOfSuccessors, numberOfPredecessors);
+	swap(activitiesSuccessors, activitiesPredecessors);
+	for (uint32_t i = 0; i < numberOfActivities; ++i)
+		swap(allSuccessorsCache[i], allPredecessorsCache[i]);
 }
 
 vector<uint32_t> ScheduleSolver::getAllRelatedActivities(uint32_t activityId, uint32_t *numberOfRelated, uint32_t **related) const	{

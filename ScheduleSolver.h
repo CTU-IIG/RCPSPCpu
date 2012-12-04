@@ -61,6 +61,12 @@ class ScheduleSolver {
 		 * \brief Lower bounds of the earliest start time values are computed for each activity.
 		 */
 		uint32_t* computeLowerBounds(const uint32_t& startActivityId, const bool& energyReasoning = false) const;
+
+		/*!
+		 * \return The method returns an estimate of the project makespan.
+		 * \brief A lower bound is computed by using the "Extended Node Packing Bound" problem.
+		 */
+		uint32_t lowerBoundOfMakespan();
 		
 		/*!
 		 * \param makespan The considered project duration is taken as a reference to upper bound computations.
@@ -154,6 +160,9 @@ class ScheduleSolver {
 		//! Random swaps are performed when diversification is called.
 		void makeDiversification();
 
+		//! The method swaps directions of all precedence edges.
+		void changeDirectionOfEdges();
+
 		/*!
 		 * \param activityId The activity from which all related activities are found.
 		 * \param numberOfRelated The number of related activities for each activity.
@@ -205,6 +214,10 @@ class ScheduleSolver {
 		int8_t **relationMatrix;
 		//! Critical Path Makespan. (Critical Path Method)
 		int32_t criticalPathMakespan;
+		//! All successors of an activity. Cache purposes.
+		std::vector<std::vector<uint32_t> > allSuccessorsCache;
+		//! All predecessors of an activity. Cache purposes.
+		std::vector<std::vector<uint32_t> > allPredecessorsCache;
 
 		/* MUTABLE DATA */	
 
