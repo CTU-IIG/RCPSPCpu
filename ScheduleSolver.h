@@ -60,7 +60,7 @@ class ScheduleSolver {
 		 * \return The earliest start time for each activity.
 		 * \brief Lower bounds of the earliest start time values are computed for each activity.
 		 */
-		uint32_t* computeLowerBounds(const uint32_t& startActivityId, const bool& energyReasoning = false) const;
+		uint32_t* computeLowerBounds(const uint32_t& startActivityId, uint32_t * const& activityDurations, const bool& energyReasoning = false) const;
 
 		/*!
 		 * \return The method returns an estimate of the project makespan.

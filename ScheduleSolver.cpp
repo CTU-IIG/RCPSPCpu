@@ -3,9 +3,7 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
-#include <iterator>
 #include <list>
-#include <map>
 #include <fstream>
 #include <set>
 #include <string>
@@ -447,7 +445,7 @@ void ScheduleSolver::createInitialSolution()	{
 	}
 
 	/* IT COMPUTES THE CRITICAL PATH LENGTH */
-	uint32_t *lb1 = computeLowerBounds(0);
+	uint32_t *lb1 = computeLowerBounds(0, activitiesDuration);
 	if (numberOfActivities > 1)
 		criticalPathMakespan = lb1[numberOfActivities-1];
 	else
@@ -466,7 +464,7 @@ void ScheduleSolver::createInitialSolution()	{
 	 * After that the graph is transformed back.
 	 */
 	changeDirectionOfEdges();
-	rightLeftLongestPaths = computeLowerBounds(numberOfActivities-1, true);
+	rightLeftLongestPaths = computeLowerBounds(numberOfActivities-1, activitiesDuration, true);
 	changeDirectionOfEdges();
 
 	/* CREATE AND COPY INITIAL SCHEDULE TO THE BEST SCHEDULE */
@@ -480,7 +478,7 @@ void ScheduleSolver::createInitialSolution()	{
 	delete[] bestScheduleStartTimesById;
 }
 
-uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, const bool& energyReasoning) const {
+uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, uint32_t * const& activityDurations, const bool& energyReasoning) const {
 	// The first dummy activity is added to list.
 	list<uint32_t> expandedNodes(1, startActivityId);
 	// We have to remember closed activities. (the bound of the activity is determined)
@@ -491,7 +489,23 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 	fill(maxDistances, maxDistances+numberOfActivities, 0);
 	// All branches that go through nodes are saved.
 	// branches[i][j] = p -> The p-nd branch that started in the node j goes through node i.
-	map<uint32_t, uint32_t> * branches = new map<uint32_t, uint32_t>[numberOfActivities];
+	int32_t ** branches = NULL;
+	// An auxiliary array that stores all activities between the start activity and end activity.
+	uint32_t *intersectionOfActivities = NULL;
+	// An auxiliary array that stores the predecessors branches.
+	int32_t **predecessorsBranches = NULL;
+	// It allocates/initialises memory only if it is required.
+	if (energyReasoning == true)	 {
+		branches = new int32_t*[numberOfActivities];
+		branches[startActivityId] = new int32_t[numberOfActivities];
+		fill(branches[startActivityId], branches[startActivityId]+numberOfActivities, -1);
+		for (uint32_t id = 0; id < numberOfActivities; ++id)	{
+			if (id != startActivityId)
+				branches[id] = NULL;
+		}
+		intersectionOfActivities = new uint32_t[numberOfActivities];
+		predecessorsBranches = new int32_t*[numberOfActivities];
+	}
 
 	while (!expandedNodes.empty())	{
 		uint32_t activityId;
@@ -503,40 +517,38 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 			if (closedActivities[activityId] == false)	{
 				minimalStartTime = 0;
 				bool allPredecessorsClosed = true;
-				vector<map<uint32_t, uint32_t> > predecessorsBranches;
-				uint32_t *activityPredecessors = activitiesPredecessors[activityId];
-				for (uint32_t* p = activityPredecessors; p < activityPredecessors+numberOfPredecessors[activityId]; ++p)	{
-					if (closedActivities[*p] == false)	{
+				for (uint32_t p = 0; p < numberOfPredecessors[activityId]; ++p)	{
+					uint32_t predecessor = activitiesPredecessors[activityId][p];
+					if (closedActivities[predecessor] == false)	{
 						allPredecessorsClosed = false;
 						break;
 					} else {
 						// It updates the maximal distance from the start activity to the activity "activityId".
-						minimalStartTime = max(maxDistances[*p]+activitiesDuration[*p], minimalStartTime);
+						minimalStartTime = max(maxDistances[predecessor]+activityDurations[predecessor], minimalStartTime);
 						if (numberOfPredecessors[activityId] > 1 && energyReasoning)
-							predecessorsBranches.push_back(branches[*p]);
+							predecessorsBranches[p] = branches[predecessor];
 					}
 				}
 				if (allPredecessorsClosed)	{
 					if (numberOfPredecessors[activityId] > 1 && energyReasoning) {
 						// Output branches are found out for the node with more predecessors.
-						map<uint32_t, uint32_t> newBranches;
 						set<uint32_t> startNodesOfMultiPaths;
-						for (uint32_t k = 0; k < predecessorsBranches.size(); ++k)	{
-							map<uint32_t, uint32_t>& m = predecessorsBranches[k];
-							for (map<uint32_t, uint32_t>::const_iterator mit = m.begin(); mit != m.end(); ++mit)	{
-								map<uint32_t, uint32_t>::const_iterator sit;
-								if ((sit = newBranches.find(mit->first)) == newBranches.end())	{
-									newBranches[mit->first] = mit->second;
-								} else {
+						branches[activityId] = new int32_t[numberOfActivities];
+						fill(branches[activityId], branches[activityId]+numberOfActivities, -1);
+						for (uint32_t p = 0; p < numberOfPredecessors[activityId]; ++p)	{
+							int32_t * activityGoThroughBranches = predecessorsBranches[p];
+							for (uint32_t id = 0; id < numberOfActivities; ++id)	{
+								if (branches[activityId][id] == -1)	{
+									branches[activityId][id] = activityGoThroughBranches[id];
+								} else if (activityGoThroughBranches[id] != -1) {
 									// The branch number has to be checked.
-									if (mit->second != sit->second)	{
+									if (activityGoThroughBranches[id] != branches[activityId][id])	{
 										// Multi-paths were detected! New start node is stored.
-										startNodesOfMultiPaths.insert(mit->first);
+										startNodesOfMultiPaths.insert(id);
 									}
 								}
 							}
 						}
-						branches[activityId] = newBranches;
 						// If more than one path exists to the node "activityId", then the resource restrictions
 						// are taken into accout to improve lower bound.
 						uint32_t minimalResourceStartTime = 0;
@@ -544,21 +556,21 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 							// Vectors are sorted by activity id's.
 							const vector<uint32_t>& allSuccessors = allSuccessorsCache[*sit];
 							const vector<uint32_t>& allPredecessors = allPredecessorsCache[activityId];
-							// The vector of all activities between the activity "i" and activity "j".
-							vector<uint32_t> intersectionOfActivities;
-							set_intersection(allPredecessors.begin(), allPredecessors.end(), allSuccessors.begin(),
-									allSuccessors.end(), back_inserter(intersectionOfActivities));
+							// The array of all activities between activity "i" and activity "j".
+							uint32_t *intersectionEndPointer = set_intersection(allPredecessors.begin(), allPredecessors.end(),
+									allSuccessors.begin(), allSuccessors.end(), intersectionOfActivities);
 							for (uint32_t k = 0; k < numberOfResources; ++k)	{
 								uint32_t sumOfEnergy = 0, timeInterval;
-								for (uint32_t i = 0; i < intersectionOfActivities.size(); ++i)	{
-									uint32_t innerActivityId = intersectionOfActivities[i];
-									sumOfEnergy += activitiesDuration[innerActivityId]*activitiesResources[innerActivityId][k];
+								for (uint32_t *id = intersectionOfActivities; id < intersectionEndPointer; ++id)	{
+									uint32_t innerActivityId = *id;
+									sumOfEnergy += activityDurations[innerActivityId]*activitiesResources[innerActivityId][k];
 								}
+
 								timeInterval = sumOfEnergy/capacityOfResources[k];
 								if ((sumOfEnergy % capacityOfResources[k]) != 0)
 									++timeInterval;
 								
-								minimalResourceStartTime = max(minimalResourceStartTime, maxDistances[*sit]+activitiesDuration[*sit]+timeInterval); 
+								minimalResourceStartTime = max(minimalResourceStartTime, maxDistances[*sit]+activityDurations[*sit]+timeInterval); 
 							}
 						}
 						minimalStartTime = max(minimalStartTime, minimalResourceStartTime);
@@ -573,26 +585,43 @@ uint32_t* ScheduleSolver::computeLowerBounds(const uint32_t& startActivityId, co
 		}
 		
 		if (lit != expandedNodes.end())	{
-			closedActivities[activityId] = true;
-			maxDistances[activityId] = minimalStartTime;
-			expandedNodes.erase(lit);
+			// The successors of the current activity are added.
 			uint32_t numberOfSuccessorsOfClosedActivity = numberOfSuccessors[activityId];
 			for (uint32_t s = 0; s < numberOfSuccessorsOfClosedActivity; ++s)	{
 				uint32_t successorId = activitiesSuccessors[activityId][s];
 				if (numberOfPredecessors[successorId] <= 1 && energyReasoning)	{
-					branches[successorId] = branches[activityId];
+					branches[successorId] = new int32_t[numberOfActivities];
+					if (branches[activityId] == NULL)	{
+						fill(branches[successorId], branches[successorId], -1);
+					} else	{
+						copy(branches[activityId], branches[activityId]+numberOfActivities, branches[successorId]);
+					}
+
 					if (numberOfSuccessorsOfClosedActivity > 1)	{
 						branches[successorId][activityId] = s;
 					}
 				}
 				expandedNodes.push_back(successorId);
 			}
+
+			// The proccessed activity is closed and its distance from the start activity is updated.
+			closedActivities[activityId] = true;
+			maxDistances[activityId] = minimalStartTime;
+			// It erases a proccessed activity from the list.
+			expandedNodes.erase(lit);
 		} else {
 			break;
 		}
 	}
 
-	delete[] branches;
+	// It frees all allocated memory.
+	if (energyReasoning == true)	{
+		delete[] predecessorsBranches;
+		delete[] intersectionOfActivities;
+		for (uint32_t i = 0; i < numberOfActivities; ++i)
+			delete[] branches[i];
+		delete[] branches;
+	}
 	delete[] closedActivities; 
 
 	return maxDistances;
@@ -661,41 +690,38 @@ uint32_t ScheduleSolver::lowerBoundOfMakespan() {
 	sort(listOfActivities.begin(), listOfActivities.end());
 
 	uint32_t maximalLowerBound = 0, lowerBound = 0;
-	uint32_t *activityDurationsBackup = activitiesDuration;
-	activitiesDuration = new uint32_t[numberOfActivities];
-	copy(activityDurationsBackup, activityDurationsBackup+numberOfActivities, activitiesDuration);
+	uint32_t *activityDurations = new uint32_t[numberOfActivities];
+	copy(activitiesDuration, activitiesDuration+numberOfActivities, activityDurations);
 	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		// It computes an estimate of the lower bound.
-		changeDirectionOfEdges();
-		uint32_t *ub = computeLowerBounds(numberOfActivities-1, true);
-		changeDirectionOfEdges();
-		uint32_t *lb = computeLowerBounds(0, true);
-		maximalLowerBound = max(maximalLowerBound, lowerBound+max(lb[numberOfActivities-1], ub[0]));
-		delete[] lb; delete[] ub;
-
 		// It creates the new subset of the unprocessed activities.
 		uint32_t activityId1 = listOfActivities[i].activityId, subsetDuration = listOfActivities[i].duration;
 		if (subsetDuration > 0)	{
+			// It computes an estimate of the lower bound.
+			changeDirectionOfEdges();
+			uint32_t *ub = computeLowerBounds(numberOfActivities-1, activityDurations, true);
+			changeDirectionOfEdges();
+			uint32_t *lb = computeLowerBounds(0, activityDurations, true);
+			maximalLowerBound = max(maximalLowerBound, lowerBound+max(lb[numberOfActivities-1], ub[0]));
+			delete[] lb; delete[] ub;
+
 			// All activities which are able to run concurrently with activity "activityId1" have reduced duration.
 			for (uint32_t j = i+1; j < numberOfActivities; ++j)	{
 				if (j != i)	{
 					uint32_t durationJ = listOfActivities[j].duration;
 					uint32_t activityId2 = listOfActivities[j].activityId;
 					if (simultaneousActivities[activityId1][activityId2] == true && durationJ > 0)
-						activitiesDuration[activityId2] = listOfActivities[j].duration = ((durationJ > subsetDuration) ? durationJ-subsetDuration : 0);
+						activityDurations[activityId2] = listOfActivities[j].duration = ((durationJ > subsetDuration) ? durationJ-subsetDuration : 0);
 				}
 			}
 
 			// Remove the selected activity from the list.
-			activitiesDuration[activityId1] = listOfActivities[i].duration = 0;
+			activityDurations[activityId1] = listOfActivities[i].duration = 0;
 			lowerBound += subsetDuration;
 		}
 	}
+	maximalLowerBound = max(maximalLowerBound, lowerBound);
 
-	// It restores the durations of the activities.
-	delete[] activitiesDuration;
-	activitiesDuration = activityDurationsBackup;
-
+	delete[] activityDurations;
 	for (uint32_t i = 0; i < numberOfActivities; ++i)
 		delete[] simultaneousActivities[i];
 	delete[] simultaneousActivities;
