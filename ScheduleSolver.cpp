@@ -49,30 +49,6 @@ ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), total
 	initialiseInstanceDataAndInitialSolution(instance, instanceSolution);
 	cout<<"Lower bound: "<<lowerBoundOfMakespan(instance)<<endl;
 /*
-	vector<pair<uint32_t,uint32_t> > possibleCandidates;
-	for (uint32_t i = 0; i < numberOfActivities; ++i)	{
-		for (uint32_t j = 0; j < numberOfActivities; ++j)	{
-			bool correct = (i != j ? true : false); 
-
-			bool disjunctiveActivities = false;
-			for (uint32_t k = 0; k < numberOfResources; ++k)	{
-				if (requiredResourcesOfActivities[i][k]+requiredResourcesOfActivities[j][k] > capacityOfResources[k])
-					disjunctiveActivities = true;
-			}
-
-			if (!disjunctiveActivities)
-				correct = false;
-			
-			if (binary_search(allSuccessorsCache[i].begin(), allSuccessorsCache[i].end(), j) == true)
-				correct = false;
-			if (binary_search(allPredecessorsCache[i].begin(), allPredecessorsCache[i].end(), j) == true)
-				correct = false;
-			if (correct)
-				possibleCandidates.push_back(pair<uint32_t,uint32_t>(i,j));
-		}
-	}
-	cout<<"Number of candidates: "<<possibleCandidates.size()<<endl;
-
 	map<uint32_t, uint32_t> counters;
 	for (vector<pair<uint32_t,uint32_t> >::const_iterator it = possibleCandidates.begin(); it != possibleCandidates.end(); ++it)	{
 		// update cache + activities data.	
@@ -369,22 +345,19 @@ void ScheduleSolver::writeBestScheduleToFile(const string& fileName) {
 }
 
 ScheduleSolver::~ScheduleSolver()	{
-	for (uint32_t actId = 0; actId < instance.numberOfActivities; ++actId)	{
-		delete[] instance.predecessorsOfActivity[actId];
-	}
-	delete[] instance.predecessorsOfActivity;
-	delete[] instance.numberOfPredecessors;
-
-	for (uint32_t activityId = 0; activityId < instance.numberOfActivities; ++activityId)
-		delete[] instance.matrixOfSuccessors[activityId];
-	delete[] instance.matrixOfSuccessors;
-
 	for (uint32_t i = 0; i < instance.numberOfActivities; ++i)	{
+		delete[] instance.predecessorsOfActivity[i];
+		delete[] instance.matrixOfSuccessors[i];
 		delete instance.allSuccessorsCache[i];
 		delete instance.allPredecessorsCache[i];
+		delete[] instance.disjunctiveActivities[i];
 	}
 
+	delete[] instance.numberOfPredecessors;
+	delete[] instance.predecessorsOfActivity;
+	delete[] instance.matrixOfSuccessors;
 	delete[] instance.rightLeftLongestPaths;
+	delete[] instance.disjunctiveActivities;
 
 	delete[] instanceSolution.orderOfActivities;
 	delete[] instanceSolution.bestScheduleOrder;
@@ -518,6 +491,45 @@ void ScheduleSolver::initialiseInstanceDataAndInitialSolution(InstanceData& proj
 	copy(solution.orderOfActivities, solution.orderOfActivities+project.numberOfActivities, solution.bestScheduleOrder);
 
 	delete[] bestScheduleStartTimesById;
+
+	/* COMPUTE A MATRIX OF MUTUALLY DISJUNCTIVE ACTIVITIES */
+
+	project.disjunctiveActivities = new bool*[project.numberOfActivities];
+	for (uint32_t i = 0; i < project.numberOfActivities; ++i)	{
+		project.disjunctiveActivities[i] = new bool[project.numberOfActivities];
+		fill(project.disjunctiveActivities[i], project.disjunctiveActivities[i]+project.numberOfActivities, false);
+	}
+
+	for (uint32_t i = 0; i < project.numberOfActivities; ++i)	{
+		for (uint32_t j = i+1; j < project.numberOfActivities; ++j)	{
+			bool simultaneous = true;
+			if (binary_search(project.allSuccessorsCache[i]->begin(), project.allSuccessorsCache[i]->end(), j) == true)	{
+				simultaneous = false;
+			}
+			if (simultaneous && binary_search(project.allPredecessorsCache[i]->begin(), project.allPredecessorsCache[i]->end(), j) == true)	{
+				simultaneous = false;
+			}
+
+			for (uint32_t k = 0; k < project.numberOfResources && simultaneous; ++k)	{
+				if (project.requiredResourcesOfActivities[i][k]+project.requiredResourcesOfActivities[j][k] > project.capacityOfResources[k])
+					simultaneous = false;
+			}
+
+			// Since the matrix is symmetric then matrix[i][j] = matrix[j][i].
+			project.disjunctiveActivities[j][i] = project.disjunctiveActivities[i][j] = !simultaneous;
+		}
+	}
+/*
+	for (uint32_t i = 0; i < project.numberOfActivities; ++i)	{
+		uint64_t counter = 0;
+		cout<<i<<"\t";
+		for (uint32_t j = 0; j < project.numberOfActivities; ++j)	{
+			cout<<" "<<project.disjunctiveActivities[i][j];
+			if (project.disjunctiveActivities[i][j])
+				++counter;
+		}
+		cout<<"\t"<<counter<<endl;
+	} */
 }
 
 ofstream& ScheduleSolver::writeBestScheduleToFile(ofstream& out, const InstanceData& project, const InstanceSolution& solution)	{
@@ -727,42 +739,12 @@ uint32_t ScheduleSolver::lowerBoundOfMakespan(const InstanceData& project) {
 		uint32_t duration;
 	};
 
-	bool **simultaneousActivities = new bool*[project.numberOfActivities];
-	for (uint32_t i = 0; i < project.numberOfActivities; ++i)	{
-		// All activities are set to run simultaneously with each other.
-		simultaneousActivities[i] = new bool[project.numberOfActivities];
-		fill(simultaneousActivities[i], simultaneousActivities[i]+project.numberOfActivities, true);
-
-		// All successors and predecessors of activity "i" cannot be run with activity "i" concurrently.
-		vector<uint32_t> timeDisjunctiveActivities(project.allSuccessorsCache[i]->begin(), project.allSuccessorsCache[i]->end());
-		vector<uint32_t> disjunctivePredecessors(project.allPredecessorsCache[i]->begin(), project.allPredecessorsCache[i]->end());
-		timeDisjunctiveActivities.insert(timeDisjunctiveActivities.end(), disjunctivePredecessors.begin(), disjunctivePredecessors.end());
-		for (vector<uint32_t>::const_iterator it = timeDisjunctiveActivities.begin(); it != timeDisjunctiveActivities.end(); ++it)
-			simultaneousActivities[i][*it] = false;
-		
-		// Resource availabilities must be checked.
-		for (uint32_t j = 0; j < project.numberOfActivities; ++j)	{
-			if (j != i)	{
-				if (simultaneousActivities[i][j] == true)	{
-					for (uint32_t k = 0; k < project.numberOfResources; ++k)	{
-						if (project.requiredResourcesOfActivities[i][k]+project.requiredResourcesOfActivities[j][k] > project.capacityOfResources[k])	{
-							simultaneousActivities[i][j] = false;
-							break;
-						}
-					}
-				}
-			} else {
-				simultaneousActivities[i][j] = false;
-			}
-		}
-	}
-
 	// It creates the list of activities.
 	vector<ListActivity> listOfActivities;
 	for (uint32_t i = 0; i < project.numberOfActivities; ++i)	{
 		uint32_t concurrencyLevel = 0;
 		for (uint32_t j = 0; j < project.numberOfActivities; ++j)	{
-			if (simultaneousActivities[i][j])
+			if (i != j && project.disjunctiveActivities[i][j] == false)
 				++concurrencyLevel;
 		}
 		listOfActivities.push_back(ListActivity(i, concurrencyLevel, project.durationOfActivities[i]));
@@ -792,7 +774,7 @@ uint32_t ScheduleSolver::lowerBoundOfMakespan(const InstanceData& project) {
 				if (j != i)	{
 					uint32_t durationJ = listOfActivities[j].duration;
 					uint32_t activityId2 = listOfActivities[j].activityId;
-					if (simultaneousActivities[activityId1][activityId2] == true && durationJ > 0)
+					if (project.disjunctiveActivities[activityId1][activityId2] == false && durationJ > 0)
 						copyOfProject.durationOfActivities[activityId2] = listOfActivities[j].duration = ((durationJ > subsetDuration) ? durationJ-subsetDuration : 0);
 				}
 			}
@@ -805,9 +787,6 @@ uint32_t ScheduleSolver::lowerBoundOfMakespan(const InstanceData& project) {
 	maximalLowerBound = max(maximalLowerBound, lowerBound);
 
 	delete[] copyOfProject.durationOfActivities;
-	for (uint32_t i = 0; i < copyOfProject.numberOfActivities; ++i)
-		delete[] simultaneousActivities[i];
-	delete[] simultaneousActivities;
 
 	return maximalLowerBound;
 }

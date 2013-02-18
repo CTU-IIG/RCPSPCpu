@@ -101,7 +101,7 @@ class ScheduleSolver {
 		static uint32_t computeUpperBoundsOverhangPenalty(const InstanceData& project, const InstanceSolution& solution, const uint32_t * const& startTimesById);
 
 		/*!
-		 * \param projet The data of the printed instance.
+		 * \param project The data of the printed instance.
 		 * \param solution The solution of the instance.
 		 * \param runTime The computation time at seconds.
 		 * \param evaluatedSchedules The number of evaluated schedules during execution.
@@ -193,7 +193,7 @@ class ScheduleSolver {
 
 		/*!
 		 * \param project The data of the instance.
-		 * \param A solution in which a diversification will be performed.
+		 * \param solution A solution in which a diversification will be performed.
 		 * \brief Random swaps are performed when diversification is called..
 		 */
 		static void makeDiversification(const InstanceData& project, InstanceSolution& solution);
@@ -236,6 +236,7 @@ class ScheduleSolver {
 
 		/* IMMUTABLE DATA */
 
+		//! A static parameters of a RCPSP project.
 		struct InstanceData	{
 			//! Number of renewable sources.
 			uint32_t numberOfResources;
@@ -267,6 +268,8 @@ class ScheduleSolver {
 			std::vector<std::vector<uint32_t>*> allSuccessorsCache;
 			//! All predecessors of an activity. Cache purposes.
 			std::vector<std::vector<uint32_t>*> allPredecessorsCache;
+			//! The matrix of disjunctive activities.
+			bool** disjunctiveActivities;
 		};
 
 		//! The data of the read instance.
@@ -275,6 +278,7 @@ class ScheduleSolver {
 
 		/* MUTABLE DATA */	
 
+		//! A solution of a project is stored in this structure.
 		struct InstanceSolution	{
 			//! Current activities order.
 			uint32_t *orderOfActivities;
