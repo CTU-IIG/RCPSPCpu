@@ -64,6 +64,14 @@ class ScheduleSolver {
 		 */
 		static void initialiseInstanceDataAndInitialSolution(InstanceData& project, InstanceSolution& solution);
 
+
+		/*!
+		 * \param project The data of the read instance.
+		 * \param solution An initial order will be written to this data-structure.
+		 * \brief An initial order of activities is created using precedence graph stored in the project data-structure.
+		 */
+		static void createInitialSolution(const InstanceData& project, InstanceSolution& solution);
+
 		/*!
 		 * \param out The output stream where the instance data and the solution will be written.
 		 * \param project The project instance data that will be written to the output file.
@@ -89,6 +97,8 @@ class ScheduleSolver {
 		 * \brief A lower bound is computed by using the "Extended Node Packing Bound" problem.
 		 */
 		static uint32_t lowerBoundOfMakespan(const InstanceData& project);
+
+		static void createStaticTreeOfSolutions(const InstanceData& project);
 		
 		/*!
 		 * \param project The data of the instance.
@@ -234,6 +244,8 @@ class ScheduleSolver {
 		ScheduleSolver& operator=(const ScheduleSolver&);
 
 
+		static uint32_t *copyAndPush(uint32_t* array, uint32_t size, uint32_t value);
+
 		/* IMMUTABLE DATA */
 
 		//! A static parameters of a RCPSP project.
@@ -269,7 +281,18 @@ class ScheduleSolver {
 			//! All predecessors of an activity. Cache purposes.
 			std::vector<std::vector<uint32_t>*> allPredecessorsCache;
 			//! The matrix of disjunctive activities.
-			bool** disjunctiveActivities;
+			bool **disjunctiveActivities;
+			//! An artificially added directed edge to the problem.
+			struct Edge {
+				//! The start node.
+				uint32_t i;
+				//! The end node.
+				uint32_t j;
+				//! A weight of the edge.
+				int32_t weight;
+			};
+			//! A list of added edges to the problem.
+			std::vector<Edge> addedEdges;
 		};
 
 		//! The data of the read instance.
