@@ -790,10 +790,10 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 	vector<pair<uint32_t,void*> > allocatedMemory;
 	map<uint32_t, uint32_t> counters;
 	list<pair<uint32_t, InstanceData> > staticTree;
-	// !! REWRITE ARRAYS OF SUCCESSORS AND PREDECESSORS!!
 	staticTree.push_back(pair<uint32_t, InstanceData>(0, project));
 
 	while (staticTree.size() < maxListSize && !staticTree.empty())	{
+		uint32_t deep = staticTree.front().first;
 		InstanceData parent = staticTree.front().second;
 		staticTree.pop_front();
 		uint32_t parentLowerBound = lowerBoundOfMakespan(parent);
@@ -803,12 +803,29 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 		gettimeofday(&startTime, NULL);
 
 		bool threadsStop = false;
+		InstanceData bestChild1, bestChild2;
+		uint32_t bestBranchCost = UINT32_MAX;
+		random_shuffle(candidates.begin(), candidates.end());
+		cout<<"START ITERATION"<<endl;
 		#pragma omp parallel for 
 		for (uint32_t o = 0; o < candidates.size(); ++o)	{
 			if (!threadsStop)	{
 				// Selected pair of activities.
 				InstanceData child1 = parent, child2 = parent;
 				uint32_t i = candidates[o].first, j = candidates[o].second;
+
+				bool alreadyAdded = false;
+				for (vector<InstanceData::Edge>::const_iterator it = parent.addedEdges.begin(); it != parent.addedEdges.end(); ++it)	{
+					if ((it->i == i && it->j == j) || (it->i == j && it->j == i)
+							|| (binary_search(parent.allSuccessorsCache[i]->begin(), parent.allSuccessorsCache[i]->end(), j) == true)
+							|| (binary_search(parent.allPredecessorsCache[i]->begin(), parent.allPredecessorsCache[i]->end(), j) == true))	{
+						alreadyAdded = true;
+						break;	
+					}
+				}
+
+				if (alreadyAdded)
+					continue;
 
 				// Check already added edges!
 
@@ -829,8 +846,8 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 					copyPredecessors[j] = copyAndPush(parent.predecessorsOfActivity[j], numberOfPredecessors[j], i);
 					++numberOfSuccessors[i]; ++numberOfPredecessors[j];
 					// Update the caches of successors and predecessors;
-					vector<uint32_t> *iPart = getAllActivityPredecessors(i, child);
-					vector<uint32_t> *jPart = getAllActivitySuccessors(j, child);
+					vector<uint32_t>* iPart = new vector<uint32_t>(*parent.allPredecessorsCache[i]);
+					vector<uint32_t>* jPart = new vector<uint32_t>(*parent.allSuccessorsCache[j]);
 					vector<uint32_t>::iterator sit1 = upper_bound(iPart->begin(), iPart->end(), i);
 					vector<uint32_t>::iterator sit2 = upper_bound(jPart->begin(), jPart->end(), j);
 					iPart->insert(sit1, i); jPart->insert(sit2, j);
@@ -904,7 +921,18 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 					threadsStop = true;
 				}
 				#pragma omp critical
+				{
+				if (lb1 + lb2 < bestBranchCost)	{
+					bestBranchCost = lb1+lb2;
+					bestChild1 = child1; bestChild2 = child2;
+					InstanceData::Edge edge = { i,j, -1 };
+					bestChild1.addedEdges.push_back(edge);
+					swap(edge.i, edge.j);
+					bestChild2.addedEdges.push_back(edge);
+					cout<<i<<" "<<j<<endl;
+				}
 				++counters[lb1+lb2];
+				}
 			}
 		}
 
@@ -913,10 +941,26 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 		timersub(&endTime, &startTime, &diffTime);
 		double totalRunTime = diffTime.tv_sec+diffTime.tv_usec/1000000.;
 		cout<<"Runtime: "<<totalRunTime<<endl;
+
+		staticTree.push_back(pair<uint32_t,InstanceData>(deep+1, bestChild1));
+		staticTree.push_back(pair<uint32_t,InstanceData>(deep+1, bestChild2));
+		cout<<"STOP ITERATION"<<endl;
 	}
 
 	for (map<uint32_t,uint32_t>::const_iterator it = counters.begin(); it != counters.end(); ++it)	{
 		cout<<it->first<<" -> "<<it->second<<endl;
+	}
+
+	cout<<"Total number of modified instances: "<<staticTree.size()<<endl;
+	for (list<pair<uint32_t,InstanceData> >::const_iterator it = staticTree.begin(); it != staticTree.end(); ++it)	{
+		cout<<string(50,'+')<<endl;
+		cout<<"Solution lower bound: "<<lowerBoundOfMakespan(it->second)<<endl;
+		cout<<"Deep: "<<it->first<<endl;
+		cout<<"Edges:";
+		for (auto e : it->second.addedEdges)
+			cout<<" ("<<e.i<<","<<e.j<<")";
+		cout<<endl;
+		cout<<string(50,'-')<<endl;
 	}
 
 	for (vector<pair<uint32_t,void*> >::iterator it = allocatedMemory.begin(); it != allocatedMemory.end(); ++it)	{
@@ -1170,10 +1214,10 @@ void ScheduleSolver::changeDirectionOfEdges(InstanceData& project)	{
 	swap(project.successorsOfActivity, project.predecessorsOfActivity);
 	for (uint32_t i = 0; i < project.numberOfActivities; ++i)
 		swap(project.allSuccessorsCache[i], project.allPredecessorsCache[i]);
-	for (vector<InstanceData::Edge>::iterator it = project.addedEdges.begin(); it != project.addedEdges.end(); ++it)	{
-		it->weight = -project.durationOfActivities[it->i]+project.durationOfActivities[it->j]+it->weight;
-		swap(it->i, it->j);
-	}
+//	for (vector<InstanceData::Edge>::iterator it = project.addedEdges.begin(); it != project.addedEdges.end(); ++it)	{
+//		it->weight = -project.durationOfActivities[it->i]+project.durationOfActivities[it->j]+it->weight;
+//		swap(it->i, it->j);
+//	}
 }
 
 vector<uint32_t>* ScheduleSolver::getAllRelatedActivities(uint32_t activityId, uint32_t *numberOfRelated, uint32_t **related, uint32_t numberOfActivities) {
