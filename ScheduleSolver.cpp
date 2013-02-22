@@ -49,10 +49,6 @@ ScheduleSolver::ScheduleSolver(const InputReader& rcpspData) : tabu(NULL), total
 	initialiseInstanceDataAndInitialSolution(instance, instanceSolution);
 	createStaticTreeOfSolutions(instance);
 	cout<<"Lower bound: "<<lowerBoundOfMakespan(instance)<<endl;
-/*
-	for (map<uint32_t,uint32_t>::const_iterator it = counters.begin(); it != counters.end(); ++it)	{
-		cout<<it->first<<" -> "<<it->second<<endl;
-	} */
 }
 
 void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphFilename)	{
@@ -772,6 +768,8 @@ uint32_t ScheduleSolver::lowerBoundOfMakespan(const InstanceData& project) {
 	return maximalLowerBound;
 }
 
+#include <map>
+
 void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 	vector<pair<uint32_t, uint32_t> > candidates;
 	for (uint32_t i = 0; i < project.numberOfActivities; ++i)	{
@@ -790,7 +788,7 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 
 	uint32_t maxListSize = 32;
 	vector<pair<uint32_t,void*> > allocatedMemory;
-//	map<uint32_t, uint32_t> counters;
+	map<uint32_t, uint32_t> counters;
 	list<pair<uint32_t, InstanceData> > staticTree;
 	// !! REWRITE ARRAYS OF SUCCESSORS AND PREDECESSORS!!
 	staticTree.push_back(pair<uint32_t, InstanceData>(0, project));
@@ -799,92 +797,126 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 		InstanceData parent = staticTree.front().second;
 		staticTree.pop_front();
 		uint32_t parentLowerBound = lowerBoundOfMakespan(parent);
-		InstanceData child1 = parent, child2 = parent;
-		for (vector<pair<uint32_t,uint32_t> >::const_iterator it = candidates.begin(); it != candidates.end(); ++it)	{
-			// Selected pair of activities.
-			uint32_t i = it->first, j = it->second;
+		// Start TIMER ...
+		timeval startTime, endTime, diffTime;
+		timeval startTimeIter, endTimeIter, diffTimeIter;
+		gettimeofday(&startTime, NULL);
 
-			// Check already added edges!
+		bool threadsStop = false;
+		#pragma omp parallel for 
+		for (uint32_t o = 0; o < candidates.size(); ++o)	{
+			if (!threadsStop)	{
+				// Selected pair of activities.
+				InstanceData child1 = parent, child2 = parent;
+				uint32_t i = candidates[o].first, j = candidates[o].second;
 
-			for (uint32_t s = 0; s < 2; ++s)	{
-				// Select edge (i,j) or (j,i).
-				InstanceData& child = (s == 0 ? child1 : child2);
-				// Alloc and copy required memory, e.g. successors and predecessors 2D arrays, the number of them...
-				uint32_t *numberOfSuccessors = new uint32_t[parent.numberOfActivities], *numberOfPredecessors = new uint32_t[parent.numberOfActivities];
-				uint32_t **copySuccessors = new uint32_t*[parent.numberOfActivities], **copyPredecessors = new uint32_t*[parent.numberOfActivities];
-				copy(parent.successorsOfActivity, parent.successorsOfActivity+parent.numberOfActivities, copySuccessors);
-				copy(parent.predecessorsOfActivity, parent.predecessorsOfActivity+parent.numberOfActivities, copyPredecessors);
-				copy(parent.numberOfSuccessors, parent.numberOfSuccessors+parent.numberOfActivities, numberOfSuccessors);
-				copy(parent.numberOfPredecessors, parent.numberOfPredecessors+parent.numberOfActivities, numberOfPredecessors);
-				child.numberOfSuccessors = numberOfSuccessors; child.numberOfPredecessors = numberOfPredecessors;
-				child.successorsOfActivity = copySuccessors; child.predecessorsOfActivity = copyPredecessors;
-				// Add edge (i,j) or (j,i).
-				copySuccessors[i] = copyAndPush(parent.successorsOfActivity[i], numberOfSuccessors[i], j);
-				copyPredecessors[j] = copyAndPush(parent.predecessorsOfActivity[j], numberOfPredecessors[j], i);
-				++numberOfSuccessors[i]; ++numberOfPredecessors[j];
-				// Update the caches of successors and predecessors;
-				vector<uint32_t> *iPart = getAllActivityPredecessors(i, child);
-				vector<uint32_t> *jPart = getAllActivitySuccessors(j, child);
-				vector<uint32_t>::iterator sit1 = upper_bound(iPart->begin(), iPart->end(), i);
-				vector<uint32_t>::iterator sit2 = upper_bound(jPart->begin(), jPart->end(), j);
-				iPart->insert(sit1, i); jPart->insert(sit2, j);
-				for (vector<uint32_t>::const_iterator it2 = iPart->begin(); it2 != iPart->end(); ++it2)	{
-					vector<uint32_t> *result = new vector<uint32_t>();
-					back_insert_iterator<vector<uint32_t> > bit(*result);
-					set_union(parent.allSuccessorsCache[*it2]->begin(), parent.allSuccessorsCache[*it2]->end(), jPart->begin(), jPart->end(), bit);
-					child.allSuccessorsCache[*it2] = result;
-					allocatedMemory.push_back(pair<uint32_t,void*>(2, result));
-				}
-				for (vector<uint32_t>::const_iterator it2 = jPart->begin(); it2 != jPart->end(); ++it2)	{
-					vector<uint32_t> *result = new vector<uint32_t>();
-					back_insert_iterator<vector<uint32_t> > bit(*result);
-					set_union(parent.allPredecessorsCache[*it2]->begin(), parent.allPredecessorsCache[*it2]->end(), iPart->begin(), iPart->end(), bit);
-					child.allPredecessorsCache[*it2] = result;
-					allocatedMemory.push_back(pair<uint32_t,void*>(2, result));
-				}
-				delete iPart; delete jPart;
-				// Update the matrix of disjunctive activities.
-				bool *allocatedRows = new bool[parent.numberOfActivities];
-				fill(allocatedRows, allocatedRows+parent.numberOfActivities, false);
-				child.disjunctiveActivities = new bool*[parent.numberOfActivities];
-				copy(parent.disjunctiveActivities, parent.disjunctiveActivities+parent.numberOfActivities, child.disjunctiveActivities);
-				allocatedMemory.push_back(pair<uint32_t,void*>(3, child.disjunctiveActivities));
-				for (uint32_t a = 0; a < parent.numberOfActivities; ++a)	{
-					for (uint32_t l = 0; l < 2; ++l)	{
-						uint32_t c = (l == 0 ? i : j);
-						if (a != c && parent.disjunctiveActivities[c][a] == false)	{
-							if ((binary_search(child.allSuccessorsCache[c]->begin(), child.allSuccessorsCache[c]->end(), a) == true)
-									|| (binary_search(child.allPredecessorsCache[c]->begin(), child.allPredecessorsCache[c]->end(), a) == true))	{
-								if (!allocatedRows[a])	{
-									child.disjunctiveActivities[a] = new bool[parent.numberOfActivities];
-									copy(parent.disjunctiveActivities[a], parent.disjunctiveActivities[a]+parent.numberOfActivities, child.disjunctiveActivities[a]);
-									allocatedMemory.push_back(pair<uint32_t,void*>(4, child.disjunctiveActivities[a]));
-									allocatedRows[a] = true;
+				// Check already added edges!
+
+				for (uint32_t s = 0; s < 2; ++s)	{
+					// Select edge (i,j) or (j,i).
+					InstanceData& child = (s == 0 ? child1 : child2);
+					// Alloc and copy required memory, e.g. successors and predecessors 2D arrays, the number of them...
+					uint32_t *numberOfSuccessors = new uint32_t[parent.numberOfActivities], *numberOfPredecessors = new uint32_t[parent.numberOfActivities];
+					uint32_t **copySuccessors = new uint32_t*[parent.numberOfActivities], **copyPredecessors = new uint32_t*[parent.numberOfActivities];
+					copy(parent.successorsOfActivity, parent.successorsOfActivity+parent.numberOfActivities, copySuccessors);
+					copy(parent.predecessorsOfActivity, parent.predecessorsOfActivity+parent.numberOfActivities, copyPredecessors);
+					copy(parent.numberOfSuccessors, parent.numberOfSuccessors+parent.numberOfActivities, numberOfSuccessors);
+					copy(parent.numberOfPredecessors, parent.numberOfPredecessors+parent.numberOfActivities, numberOfPredecessors);
+					child.numberOfSuccessors = numberOfSuccessors; child.numberOfPredecessors = numberOfPredecessors;
+					child.successorsOfActivity = copySuccessors; child.predecessorsOfActivity = copyPredecessors;
+					// Add edge (i,j) or (j,i).
+					copySuccessors[i] = copyAndPush(parent.successorsOfActivity[i], numberOfSuccessors[i], j);
+					copyPredecessors[j] = copyAndPush(parent.predecessorsOfActivity[j], numberOfPredecessors[j], i);
+					++numberOfSuccessors[i]; ++numberOfPredecessors[j];
+					// Update the caches of successors and predecessors;
+					vector<uint32_t> *iPart = getAllActivityPredecessors(i, child);
+					vector<uint32_t> *jPart = getAllActivitySuccessors(j, child);
+					vector<uint32_t>::iterator sit1 = upper_bound(iPart->begin(), iPart->end(), i);
+					vector<uint32_t>::iterator sit2 = upper_bound(jPart->begin(), jPart->end(), j);
+					iPart->insert(sit1, i); jPart->insert(sit2, j);
+					for (vector<uint32_t>::const_iterator it2 = iPart->begin(); it2 != iPart->end(); ++it2)	{
+						vector<uint32_t> *result = new vector<uint32_t>();
+						back_insert_iterator<vector<uint32_t> > bit(*result);
+						set_union(parent.allSuccessorsCache[*it2]->begin(), parent.allSuccessorsCache[*it2]->end(), jPart->begin(), jPart->end(), bit);
+						child.allSuccessorsCache[*it2] = result;
+						#pragma omp critical
+						allocatedMemory.push_back(pair<uint32_t,void*>(2, result));
+					}
+					for (vector<uint32_t>::const_iterator it2 = jPart->begin(); it2 != jPart->end(); ++it2)	{
+						vector<uint32_t> *result = new vector<uint32_t>();
+						back_insert_iterator<vector<uint32_t> > bit(*result);
+						set_union(parent.allPredecessorsCache[*it2]->begin(), parent.allPredecessorsCache[*it2]->end(), iPart->begin(), iPart->end(), bit);
+						child.allPredecessorsCache[*it2] = result;
+						#pragma omp critical
+						allocatedMemory.push_back(pair<uint32_t,void*>(2, result));
+					}
+					delete iPart; delete jPart;
+					// Update the matrix of disjunctive activities.
+					bool *allocatedRows = new bool[parent.numberOfActivities];
+					fill(allocatedRows, allocatedRows+parent.numberOfActivities, false);
+					child.disjunctiveActivities = new bool*[parent.numberOfActivities];
+					copy(parent.disjunctiveActivities, parent.disjunctiveActivities+parent.numberOfActivities, child.disjunctiveActivities);
+					#pragma omp critical
+					allocatedMemory.push_back(pair<uint32_t,void*>(3, child.disjunctiveActivities));
+					for (uint32_t a = 0; a < parent.numberOfActivities; ++a)	{
+						for (uint32_t l = 0; l < 2; ++l)	{
+							uint32_t c = (l == 0 ? i : j);
+							if (a != c && parent.disjunctiveActivities[c][a] == false)	{
+								if ((binary_search(child.allSuccessorsCache[c]->begin(), child.allSuccessorsCache[c]->end(), a) == true)
+										|| (binary_search(child.allPredecessorsCache[c]->begin(), child.allPredecessorsCache[c]->end(), a) == true))	{
+									if (!allocatedRows[a])	{
+										child.disjunctiveActivities[a] = new bool[parent.numberOfActivities];
+										copy(parent.disjunctiveActivities[a], parent.disjunctiveActivities[a]+parent.numberOfActivities, child.disjunctiveActivities[a]);
+										allocatedRows[a] = true;
+										#pragma omp critical
+										allocatedMemory.push_back(pair<uint32_t,void*>(4, child.disjunctiveActivities[a]));
+									}
+									if (!allocatedRows[c])	{
+										child.disjunctiveActivities[c] = new bool[parent.numberOfActivities];
+										copy(parent.disjunctiveActivities[c], parent.disjunctiveActivities[c]+parent.numberOfActivities, child.disjunctiveActivities[c]);
+										allocatedRows[c] = true;
+										#pragma omp critical
+										allocatedMemory.push_back(pair<uint32_t,void*>(4, child.disjunctiveActivities[c]));
+									}
+									child.disjunctiveActivities[a][c] = child.disjunctiveActivities[c][a] = true;
 								}
-								if (!allocatedRows[c])	{
-									child.disjunctiveActivities[c] = new bool[parent.numberOfActivities];
-									copy(parent.disjunctiveActivities[c], parent.disjunctiveActivities[c]+parent.numberOfActivities, child.disjunctiveActivities[c]);
-									allocatedMemory.push_back(pair<uint32_t,void*>(4, child.disjunctiveActivities[c]));
-									allocatedRows[c] = true;
-								}
-								child.disjunctiveActivities[a][c] = child.disjunctiveActivities[c][a] = true;
 							}
 						}
 					}
+					delete[] allocatedRows;
+					// Store all pointers to the allocated memory to be able to free it later.
+					#pragma omp critical
+					{
+						allocatedMemory.push_back(pair<uint32_t,void*>(0, child.successorsOfActivity[i]));
+						allocatedMemory.push_back(pair<uint32_t,void*>(0, child.predecessorsOfActivity[j]));
+						allocatedMemory.push_back(pair<uint32_t,void*>(1, copySuccessors));
+						allocatedMemory.push_back(pair<uint32_t,void*>(1, copyPredecessors));
+						allocatedMemory.push_back(pair<uint32_t,void*>(0, numberOfSuccessors));
+						allocatedMemory.push_back(pair<uint32_t,void*>(0, numberOfPredecessors));
+					}
+					// Swap direction of the edge.
+					swap(i,j);
 				}
-				delete[] allocatedRows;
-				// Store all pointers to the allocated memory to be able to free it later.
-				allocatedMemory.push_back(pair<uint32_t,void*>(0, child.successorsOfActivity[i]));
-				allocatedMemory.push_back(pair<uint32_t,void*>(0, child.predecessorsOfActivity[j]));
-				allocatedMemory.push_back(pair<uint32_t,void*>(1, copySuccessors));
-				allocatedMemory.push_back(pair<uint32_t,void*>(1, copyPredecessors));
-				allocatedMemory.push_back(pair<uint32_t,void*>(0, numberOfSuccessors));
-				allocatedMemory.push_back(pair<uint32_t,void*>(0, numberOfPredecessors));
-				// Swap direction of the edge.
-				swap(i,j);
+				uint32_t lb1 = lowerBoundOfMakespan(child1);
+				uint32_t lb2 = lowerBoundOfMakespan(child2);
+				if (lb1 + lb2 <= 2*parentLowerBound)	{
+					#pragma omp critical
+					threadsStop = true;
+				}
+				#pragma omp critical
+				++counters[lb1+lb2];
 			}
 		}
 
+		// STOP TIMER...
+		gettimeofday(&endTime, NULL);
+		timersub(&endTime, &startTime, &diffTime);
+		double totalRunTime = diffTime.tv_sec+diffTime.tv_usec/1000000.;
+		cout<<"Runtime: "<<totalRunTime<<endl;
+	}
+
+	for (map<uint32_t,uint32_t>::const_iterator it = counters.begin(); it != counters.end(); ++it)	{
+		cout<<it->first<<" -> "<<it->second<<endl;
 	}
 
 	for (vector<pair<uint32_t,void*> >::iterator it = allocatedMemory.begin(); it != allocatedMemory.end(); ++it)	{
