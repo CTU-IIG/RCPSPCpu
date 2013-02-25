@@ -942,8 +942,10 @@ void ScheduleSolver::createStaticTreeOfSolutions(const InstanceData& project)	{
 		double totalRunTime = diffTime.tv_sec+diffTime.tv_usec/1000000.;
 		cout<<"Runtime: "<<totalRunTime<<endl;
 
-		staticTree.push_back(pair<uint32_t,InstanceData>(deep+1, bestChild1));
-		staticTree.push_back(pair<uint32_t,InstanceData>(deep+1, bestChild2));
+		if (bestBranchCost < UINT32_MAX)	{
+			staticTree.push_back(pair<uint32_t,InstanceData>(deep+1, bestChild1));
+			staticTree.push_back(pair<uint32_t,InstanceData>(deep+1, bestChild2));
+		}
 		cout<<"STOP ITERATION"<<endl;
 	}
 
