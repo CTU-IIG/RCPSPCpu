@@ -92,15 +92,6 @@ class ScheduleSolver {
 		static uint32_t* computeLowerBounds(const uint32_t& startActivityId, const InstanceData& project, const bool& energyReasoning = false);
 
 		/*!
-		 * \param project The instance data of the instance.
-		 * \return The method returns an estimate of the project makespan.
-		 * \brief A lower bound is computed by using the "Extended Node Packing Bound" problem.
-		 */
-		static uint32_t lowerBoundOfMakespan(const InstanceData& project);
-
-		static void createStaticTreeOfSolutions(const InstanceData& project);
-		
-		/*!
 		 * \param project The data of the instance.
 		 * \param solution Current solution of the instance. The best makespan value is required.
 		 * \param startTimesById The start time value for each activity.
@@ -244,8 +235,6 @@ class ScheduleSolver {
 		ScheduleSolver& operator=(const ScheduleSolver&);
 
 
-		static uint32_t *copyAndPush(uint32_t* array, uint32_t size, uint32_t value);
-
 		/* IMMUTABLE DATA */
 
 		//! A static parameters of a RCPSP project.
@@ -280,19 +269,6 @@ class ScheduleSolver {
 			std::vector<std::vector<uint32_t>*> allSuccessorsCache;
 			//! All predecessors of an activity. Cache purposes.
 			std::vector<std::vector<uint32_t>*> allPredecessorsCache;
-			//! The matrix of disjunctive activities.
-			bool **disjunctiveActivities;
-			//! An artificially added directed edge to the problem.
-			struct Edge {
-				//! The start node.
-				uint32_t i;
-				//! The end node.
-				uint32_t j;
-				//! A weight of the edge.
-				int32_t weight;
-			};
-			//! A list of added edges to the problem.
-			std::vector<Edge> addedEdges;
 		};
 
 		//! The data of the read instance.
