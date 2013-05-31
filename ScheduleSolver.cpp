@@ -3,6 +3,7 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
+#include <numeric>
 #include <list>
 #include <fstream>
 #include <set>
