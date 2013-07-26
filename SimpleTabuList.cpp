@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <cstdlib>
+#include <vector>
 #include "SimpleTabuList.h"
 
 using namespace std;
@@ -34,6 +37,25 @@ void SimpleTabuList::addTurnToTabuList(const uint32_t& i, const uint32_t& j, con
 	tabuSearch[i][j] = true;
 
 	curIdx = (curIdx+1) % tabuLength;
+}
+
+void SimpleTabuList::prune()	{
+	vector<uint32_t> indicesOfValidMoves;
+	uint32_t numberOfValidMovesInTabuList = 0;
+	for (uint32_t m = 0; m < tabuLength; ++m)	{
+		if (tabu[m].i != -1 && tabu[m].j != -1)	{
+			indicesOfValidMoves.push_back(m);
+			++numberOfValidMovesInTabuList;
+		}
+	}
+	random_shuffle(indicesOfValidMoves.begin(), indicesOfValidMoves.end());
+
+	uint32_t theNumberOfMovesToRemove = (uint32_t) 0.3*numberOfValidMovesInTabuList;
+	for (uint32_t m = 0; m < theNumberOfMovesToRemove; ++m)	{
+		uint32_t moveIndex = indicesOfValidMoves[m];
+		tabuSearch[tabu[moveIndex].i][tabu[moveIndex].j] = false;
+		tabu[moveIndex].i = tabu[moveIndex].j = -1;
+	}
 }
 
 SimpleTabuList::~SimpleTabuList()	{

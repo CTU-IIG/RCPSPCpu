@@ -53,6 +53,12 @@ class SimpleTabuList : public TabuList {
 		 */
 		virtual void addTurnToTabuList(const uint32_t& i, const uint32_t& j, const MoveType&);
 
+		/*!
+		 * If the tabu list does not allow to select any solution in the neighbourhood
+		 * some random moves are required to be pruned from the tabu list. The method removes 30 % of the tabu list moves.
+		 */
+		virtual void prune();
+
 		//! Free all allocated resources. (i.e. tabu list and tabu hash)
 		virtual ~SimpleTabuList();
 

@@ -43,8 +43,8 @@ class TabuList	{
 		 * \return Number of erased tabu list items.
 		 */
 		virtual uint32_t goToNextIter() { return 0; }; 
-		//! Prunning tabu list.
-		virtual void randomizeTabuList() { };
+		//! The method removes some tabu moves randomly since all solutions in neighbourhood were tabu.
+		virtual void prune() = 0;
 		//! Virtual destructor of TabuList class.
 		virtual ~TabuList() { };
 };

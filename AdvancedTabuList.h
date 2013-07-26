@@ -109,8 +109,8 @@ class AdvancedTabuList : public TabuList {
 		virtual void bestSolutionFound();
 		//! Inform tabu list about new iteration. Required for update lives of the tabu list elements and for randomisation.
 		virtual uint32_t goToNextIter();
-		//! Randomly erase some amount of tabu list elements.
-		virtual void randomizeTabuList();
+		//! Randomly erase some amount of the tabu list elements.
+		virtual void prune();
 
 		//! All allocated resources are automatically freed.
 		virtual ~AdvancedTabuList() { }

@@ -247,46 +247,46 @@ void ScheduleSolver::solveSchedule(const uint32_t& maxIter, const string& graphF
 				tabu->addTurnToTabuList(iterBestI, iterBestJ, SWAP);
 			else if ((iterBestMove == SHIFT) && (tabu->isPossibleMove(iterBestI, iterBestI, SHIFT) == true))
 				tabu->addTurnToTabuList(iterBestI, iterBestI, SHIFT);
-		} else {
-			clog<<"Expanded neighborhood is empty! Prematurely ending..."<<endl;
-			break;
-		}
 
-		// Apply best move.
-		switch (iterBestMove)	{
-			case SWAP:
-				swap(instanceSolution.orderOfActivities[iterBestI], instanceSolution.orderOfActivities[iterBestJ]);
-				break;
-			case SHIFT:
-				makeShift(instanceSolution.orderOfActivities, ((int32_t) iterShiftDiff)-((int32_t) iterBestI), iterBestI);
-				break;
-			default:
-				throw runtime_error("ScheduleSolver::solveSchedule: Unsupported type of move!");
-		}
-
-		if (iterBestEval < instanceSolution.costOfBestSchedule)	{
-			instanceSolution.costOfBestSchedule = iterBestEval;
-			uint32_t *bestScheduleStartTimesById = new uint32_t[instance.numberOfActivities];
-			uint32_t shakedCost = shakingDownEvaluation(instance, instanceSolution, bestScheduleStartTimesById);
-			if (shakedCost < instanceSolution.costOfBestSchedule)	{
-				convertStartTimesById2ActivitiesOrder(instance, instanceSolution, bestScheduleStartTimesById);
-				instanceSolution.costOfBestSchedule = shakedCost;
+			// Apply best move.
+			switch (iterBestMove)	{
+				case SWAP:
+					swap(instanceSolution.orderOfActivities[iterBestI], instanceSolution.orderOfActivities[iterBestJ]);
+					break;
+				case SHIFT:
+					makeShift(instanceSolution.orderOfActivities, ((int32_t) iterShiftDiff)-((int32_t) iterBestI), iterBestI);
+					break;
+				default:
+					throw runtime_error("ScheduleSolver::solveSchedule: Unsupported type of move!");
 			}
-			copy(instanceSolution.orderOfActivities, instanceSolution.orderOfActivities+instance.numberOfActivities, instanceSolution.bestScheduleOrder);
-			tabu->bestSolutionFound();
-			numberOfIterSinceBest = 0;
-			delete[] bestScheduleStartTimesById;
+
+			if (iterBestEval < instanceSolution.costOfBestSchedule)	{
+				instanceSolution.costOfBestSchedule = iterBestEval;
+				uint32_t *bestScheduleStartTimesById = new uint32_t[instance.numberOfActivities];
+				uint32_t shakedCost = shakingDownEvaluation(instance, instanceSolution, bestScheduleStartTimesById);
+				if (shakedCost < instanceSolution.costOfBestSchedule)	{
+					convertStartTimesById2ActivitiesOrder(instance, instanceSolution, bestScheduleStartTimesById);
+					instanceSolution.costOfBestSchedule = shakedCost;
+				}
+				copy(instanceSolution.orderOfActivities, instanceSolution.orderOfActivities+instance.numberOfActivities, instanceSolution.bestScheduleOrder);
+				tabu->bestSolutionFound();
+				numberOfIterSinceBest = 0;
+				delete[] bestScheduleStartTimesById;
+			} else {
+				++numberOfIterSinceBest;
+			}
+
+			if (graphFile != NULL)	{
+				fprintf(graphFile, "%u; %u; %u;\n", iter+1u, iterBestEval, instanceSolution.costOfBestSchedule);
+			}
+
+			if (numberOfIterSinceBest > ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST)	{
+				makeDiversification(instance, instanceSolution);
+				numberOfIterSinceBest = 0;
+			}
 		} else {
-			++numberOfIterSinceBest;
-		}
-
-		if (graphFile != NULL)	{
-			fprintf(graphFile, "%u; %u; %u;\n", iter+1u, iterBestEval, instanceSolution.costOfBestSchedule);
-		}
-
-		if (numberOfIterSinceBest > ConfigureRCPSP::MAXIMAL_NUMBER_OF_ITERATIONS_SINCE_BEST)	{
-			makeDiversification(instance, instanceSolution);
-			numberOfIterSinceBest = 0;
+			// The tabu list is full, clear some random tabu moves.
+			tabu->prune();
 		}
 
 		tabu->goToNextIter();

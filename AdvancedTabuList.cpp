@@ -72,7 +72,7 @@ uint32_t AdvancedTabuList::goToNextIter()	{
 	if (iterSinceBest > maxIterSinceBest)	{
 		// Current location in space is not suitable for improving current solution.
 		// Change location in space by randomizing tabu list.
-		randomizeTabuList();
+		prune();
 	}
 
 	uint32_t erasedItems = 0;
@@ -103,7 +103,7 @@ uint32_t AdvancedTabuList::goToNextIter()	{
 	return erasedItems;
 }
 
-void AdvancedTabuList::randomizeTabuList()	{
+void AdvancedTabuList::prune()	{
 	if (!secondBestTabu.empty())	{
 		tabu = secondBestTabu;
 		tabuHash = secondBestTabuHash;
