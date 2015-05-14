@@ -14,7 +14,7 @@ GCC_OPTIONS = -O0 -g
 LIBS = -std=c++0x
 else
 # The GCC version 4.7 supports the '-std=c++11' flag.
-GCC_OPTIONS = -pedantic -Wall -march=native -O3 -pipe -funsafe-math-optimizations -fopenmp -flto -fwhole-program
+GCC_OPTIONS = -pedantic -Wall -march=native -O3 -pipe -funsafe-math-optimizations -fopenmp
 LIBS = -std=c++0x
 endif
 
@@ -31,6 +31,8 @@ build: $(PROGRAM)
 doc: 
 	doxygen Documentation/doxyfilelatex; \
 	doxygen Documentation/doxyfilehtml
+
+all: $(PROGRAM)
 
 # Compile program.
 $(PROGRAM): $(OBJ)

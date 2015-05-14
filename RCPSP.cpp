@@ -1,3 +1,19 @@
+/*
+	This file is part of the RCPSPCpu program.
+
+	RCPSPCpu is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	RCPSPCpu is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with RCPSPCpu. If not, see <http://www.gnu.org/licenses/>.
+*/
 /*!
  * \file RCPSP.cpp
  * \author Libor Bukata
@@ -57,7 +73,7 @@ T optionHelper(const string& option, int& i, const int& argc, char* argv[])	{
 
 /*!
  * Entry point for RCPSP solver. Command line arguments are processed, input instances are
- * read and solved. Results are printed to console (can be easily redirected to file). 
+ * read and solved. Results are printed to console (can be easily redirected to file).
  * Verbose mode is turned on if and only if one input file is read.
  * \param argc Number of command line arguments.
  * \param argv Command line arguments.
@@ -82,7 +98,7 @@ int rcpsp(int argc, char* argv[])	{
 				return 1;
 			}
 		}
-		
+
 		if (arg == "--simple-tabu-list" || arg == "-stl")
 			ConfigureRCPSP::TABU_LIST_TYPE = SIMPLE_TABU;
 
@@ -120,6 +136,8 @@ int rcpsp(int argc, char* argv[])	{
 		}
 
 		if (arg == "--help" || arg == "-h")	{
+			cout<<"Copyright 2012-2015 Libor Bukata and Premysl Sucha."<<endl;
+			cout<<"The program is distributed under the terms of the GNU General Public License."<<endl;
 			cout<<"RCPSP schedule solver."<<endl<<endl;
 			cout<<"Usage:"<<endl;
 			cout<<"\t"<<argv[0]<<" [options+parameters] --input-files file1 file2 ..."<<endl;
@@ -169,7 +187,7 @@ int rcpsp(int argc, char* argv[])	{
 			reader.readFromFile(filename);
 			// Init schedule solver.
 			ScheduleSolver solver(reader);
-			// Solve read instance.	
+			// Solve read instance.
 			string graphFilename = "", resultFilename = "";
 			if (ConfigureRCPSP::WRITE_GRAPH == true || ConfigureRCPSP::WRITE_RESULT_FILE == true)	{
 				int32_t i;
@@ -189,7 +207,7 @@ int rcpsp(int argc, char* argv[])	{
 			if (verbose == true)	{
 				solver.printBestSchedule();
 			}	else	{
-				cout<<filename<<": "; 
+				cout<<filename<<": ";
 				solver.printBestSchedule(false);
 			}
 			// Write the best schedule to file.
