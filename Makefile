@@ -1,6 +1,6 @@
 CPP = g++
 
-PROGRAM = RCPSP
+PROGRAM = RCPSPCpu
 
 INST_PATH = /usr/local/bin/
 
